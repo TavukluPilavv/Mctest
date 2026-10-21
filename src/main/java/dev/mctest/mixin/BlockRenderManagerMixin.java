@@ -2,17 +2,16 @@ package dev.mctest.mixin;
 
 import dev.mctest.MctestClient;
 import net.minecraft.block.BlockState;
-import net.minecraft.client.render.block.BlockRenderManager;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.BlockRenderView;
-import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import java.util.Random;
 
 @Mixin(BlockRenderManager.class)
 public abstract class BlockRenderManagerMixin {
@@ -25,8 +24,6 @@ public abstract class BlockRenderManagerMixin {
 
         String id = state.getBlock().getTranslationKey();
         boolean ore = id.contains("_ore") || id.contains("ancient_debris");
-        if (!ore) {
-            cir.setReturnValue(false);
-        }
+        if (!ore) cir.setReturnValue(false);
     }
 }
