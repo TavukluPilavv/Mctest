@@ -11,7 +11,7 @@ import net.minecraft.world.BlockRenderView;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(BlockRenderManager.class)
 public abstract class BlockRenderManagerMixin {
@@ -19,11 +19,11 @@ public abstract class BlockRenderManagerMixin {
     private void attackaura$filterBlocks(BlockState state, BlockPos pos, BlockRenderView world,
                                          MatrixStack matrices, VertexConsumer vertexConsumer,
                                          boolean cull, Random random,
-                                         CallbackInfo ci) {
+                                         CallbackInfoReturnable<Boolean> cir) {
         if (!MctestClient.isXrayEnabled()) return;
 
         String id = state.getBlock().getTranslationKey();
         boolean ore = id.contains("_ore") || id.contains("ancient_debris");
-        if (!ore) ci.cancel();
+        if (!ore) cir.setReturnValue(false);
     }
 }
