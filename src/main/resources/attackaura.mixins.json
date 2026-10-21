@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.mctest.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "BlockRenderManagerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
