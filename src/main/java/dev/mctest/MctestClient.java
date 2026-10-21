@@ -146,6 +146,11 @@ public final class MctestClient implements ClientModInitializer {
         }
 
         @Override
+        public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+            // Intentionally skip Minecraft's blurred menu background.
+        }
+
+        @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             context.fill(0, 0, width, height, 0x99000000);
             int left = (width - PANEL_W) / 2;
@@ -227,6 +232,11 @@ public final class MctestClient implements ClientModInitializer {
         private ModuleSettingsScreen(String module) {
             super(Text.literal(module + " Settings"));
             this.module = module;
+        }
+
+        @Override
+        public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
+            // Intentionally skip Minecraft's blurred menu background.
         }
 
         @Override
