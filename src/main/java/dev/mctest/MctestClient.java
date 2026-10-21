@@ -5,7 +5,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.entity.decoration.ArmorStandEntity;
+import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
@@ -64,7 +64,7 @@ public final class MctestClient implements ClientModInitializer {
 
             // Movement and automated test actions are intentionally limited to local singleplayer.
             if (client.isInSingleplayer()) {
-                if (ENABLED.get("Attack Aura")) runDummyAttackTest(client);
+                if (ENABLED.get("Attack Aura")) runMobAttackTest(client);
                 if (ENABLED.get("Fly")) runLocalFly(client);
                 else resetFly(client);
             } else {
@@ -78,24 +78,22 @@ public final class MctestClient implements ClientModInitializer {
     }
 
     /**
-     * Controlled anti-cheat fixture: only attacks a deliberately named armor-stand dummy.
+     * Controlled anti-cheat test: targets hostile mobs in a private singleplayer test world.
      * It never targets real players and does not implement shield bypass.
-     * Name a test armor stand exactly "VEXION-TEST-DUMMY" in a private singleplayer test world.
      */
-    private static void runDummyAttackTest(MinecraftClient client) {
+    private static void runMobAttackTest(MinecraftClient client) {
         PlayerEntity player = client.player;
         if (player == null || client.world == null || client.interactionManager == null) return;
 
-        ArmorStandEntity target = client.world.getEntitiesByClass(
-                ArmorStandEntity.class,
+        HostileEntity target = client.world.getEntitiesByClass(
+                HostileEntity.class,
                 player.getBoundingBox().expand(attackRange),
-                entity -> entity.isAlive() && entity.hasCustomName()
-                        && "VEXION-TEST-DUMMY".equals(entity.getCustomName().getString())
+                entity -> entity.isAlive()
                         && player.squaredDistanceTo(entity) <= attackRange * attackRange
         ).stream().findFirst().orElse(null);
         if (target == null) return;
 
-        // Aim at the dummy's head/eye position for repeatable anti-cheat testing.
+        // Aim at the mob's eye position for repeatable anti-cheat testing.
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
         double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
@@ -170,7 +168,7 @@ public final class MctestClient implements ClientModInitializer {
             }
             context.drawText(textRenderer, "Left-click: toggle   Middle-click: bind   Right-click: settings",
                     left + 12, top + 146, 0xFFFFFFFF, false);
-            context.drawText(textRenderer, "Attack Aura test only targets VEXION-TEST-DUMMY armor stands.",
+            context.drawText(textRenderer, "Attack Aura test targets hostile mobs in singleplayer only.",
                     left + 12, top + 163, 0xFFFFC7A8, false);
             super.render(context, mouseX, mouseY, delta);
         }
@@ -247,7 +245,7 @@ public final class MctestClient implements ClientModInitializer {
                         left + 16, top + 103, 0xFFFFFFFF, false);
                 drawButton(context, left + 16, top + 123, " - Interval ");
                 drawButton(context, left + 176, top + 123, " + Interval ");
-                context.drawText(textRenderer, "Only named test armor stands; no player targeting.",
+                context.drawText(textRenderer, "Hostile mobs only; singleplayer test world.",
                         left + 16, top + 151, 0xFFFFC7A8, false);
             } else if ("Fly".equals(module)) {
                 context.drawText(textRenderer, "Vertical speed: " + String.format("%.2f", flySpeed),
