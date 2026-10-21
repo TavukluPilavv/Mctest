@@ -3,7 +3,7 @@
   "id": "attackaura",
   "version": "${version}",
   "name": "AttackAura",
-  "description": "A client-side configurable menu prototype for Minecraft Java 1.21.4 private test worlds.",
+  "description": "Client-side AttackAura, Fly and X-Ray modules for Minecraft Java 1.21.4 private testing.",
   "authors": ["Mctest"],
   "environment": "client",
   "entrypoints": {
@@ -11,6 +11,9 @@
       "dev.mctest.MctestClient"
     ]
   },
+  "mixins": [
+    "attackaura.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=0.16.10",
     "minecraft": "~1.21.4",
