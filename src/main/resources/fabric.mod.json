@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "mctest",
+  "version": "${version}",
+  "name": "Mctest",
+  "description": "A client-side Fabric test mod for a private Minecraft 1.21.4 test world.",
+  "authors": ["Mctest"],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.mctest.MctestClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
