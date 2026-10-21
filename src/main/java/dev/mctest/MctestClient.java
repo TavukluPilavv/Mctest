@@ -17,7 +17,7 @@ public final class MctestClient implements ClientModInitializer {
                 "key.mctest.test_message",
                 InputUtil.Type.KEYSYM,
                 GLFW.GLFW_KEY_K,
-                KeyBinding.Category.MISC
+                "category.misc"
         ));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
