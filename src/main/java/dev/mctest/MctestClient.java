@@ -233,7 +233,7 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            renderBackground(context, mouseX, mouseY, delta);
+            context.fill(0, 0, width, height, 0x66000000);
             int left = (width - 330) / 2;
             int top = (height - 170) / 2;
             context.fill(left, top, left + 330, top + 170, 0xEE111827);
