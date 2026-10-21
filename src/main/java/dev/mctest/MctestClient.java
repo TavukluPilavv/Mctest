@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
@@ -22,18 +23,16 @@ public final class MctestClient implements ClientModInitializer {
     private static final Map<String, Integer> BINDS = new LinkedHashMap<>();
     private static final Map<String, Boolean> KEY_WAS_DOWN = new LinkedHashMap<>();
     private static double attackRange = 3.0;
+    private static int attackIntervalTicks = 10;
+    private static double flySpeed = 0.45;
     private static int attackDelayTicks;
 
     static {
-        ENABLED.put("AttackAura", false);
-        ENABLED.put("Fly", false);
-        ENABLED.put("X-Ray", false);
-        BINDS.put("AttackAura", GLFW.GLFW_KEY_UNKNOWN);
-        BINDS.put("Fly", GLFW.GLFW_KEY_UNKNOWN);
-        BINDS.put("X-Ray", GLFW.GLFW_KEY_UNKNOWN);
-        KEY_WAS_DOWN.put("AttackAura", false);
-        KEY_WAS_DOWN.put("Fly", false);
-        KEY_WAS_DOWN.put("X-Ray", false);
+        for (String module : new String[]{"Attack Aura", "Fly", "X-Ray"}) {
+            ENABLED.put(module, false);
+            BINDS.put(module, GLFW.GLFW_KEY_UNKNOWN);
+            KEY_WAS_DOWN.put(module, false);
+        }
     }
 
     @Override
@@ -63,9 +62,9 @@ public final class MctestClient implements ClientModInitializer {
                 return;
             }
 
-            // Movement/combat helpers are restricted to a local singleplayer test world.
+            // Movement and automated test actions are intentionally limited to local singleplayer.
             if (client.isInSingleplayer()) {
-                if (ENABLED.get("AttackAura")) runLocalAttackAura(client);
+                if (ENABLED.get("Attack Aura")) runDummyAttackTest(client);
                 if (ENABLED.get("Fly")) runLocalFly(client);
                 else resetFly(client);
             } else {
@@ -78,20 +77,22 @@ public final class MctestClient implements ClientModInitializer {
         return ENABLED.get("X-Ray");
     }
 
-    private static void runLocalAttackAura(MinecraftClient client) {
+    /**
+     * Controlled anti-cheat fixture: only attacks a deliberately named armor-stand dummy.
+     * It never targets real players and does not implement shield bypass.
+     * Name a test armor stand exactly "VEXION-TEST-DUMMY" in a private singleplayer test world.
+     */
+    private static void runDummyAttackTest(MinecraftClient client) {
         PlayerEntity player = client.player;
         if (player == null || client.world == null || client.interactionManager == null) return;
 
-        PlayerEntity target = null;
-        double bestDistance = attackRange * attackRange;
-        for (PlayerEntity candidate : client.world.getPlayers()) {
-            if (candidate == player || !candidate.isAlive() || candidate.isSpectator()) continue;
-            double distance = player.squaredDistanceTo(candidate);
-            if (distance <= bestDistance) {
-                bestDistance = distance;
-                target = candidate;
-            }
-        }
+        ArmorStandEntity target = client.world.getEntitiesByClass(
+                ArmorStandEntity.class,
+                player.getBoundingBox().expand(attackRange),
+                entity -> entity.isAlive() && entity.hasCustomName()
+                        && "VEXION-TEST-DUMMY".equals(entity.getCustomName().getString())
+                        && player.squaredDistanceTo(entity) <= attackRange * attackRange
+        ).stream().findFirst().orElse(null);
         if (target == null) return;
 
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
@@ -107,7 +108,7 @@ public final class MctestClient implements ClientModInitializer {
         } else if (player.getAttackCooldownProgress(0.5F) >= 1.0F) {
             client.interactionManager.attackEntity(player, target);
             player.swingHand(Hand.MAIN_HAND);
-            attackDelayTicks = 2;
+            attackDelayTicks = attackIntervalTicks;
         }
     }
 
@@ -115,8 +116,8 @@ public final class MctestClient implements ClientModInitializer {
         if (client.player == null) return;
         flyWasRun = true;
         double vertical = 0.0;
-        if (client.options.jumpKey.isPressed()) vertical += 0.45;
-        if (client.options.sneakKey.isPressed()) vertical -= 0.45;
+        if (client.options.jumpKey.isPressed()) vertical += flySpeed;
+        if (client.options.sneakKey.isPressed()) vertical -= flySpeed;
         Vec3d velocity = client.player.getVelocity();
         client.player.setVelocity(velocity.x, vertical, velocity.z);
         client.player.fallDistance = 0.0F;
@@ -132,11 +133,11 @@ public final class MctestClient implements ClientModInitializer {
 
     private static final class HackMenuScreen extends Screen {
         private String waitingForBind;
-        private static final int PANEL_W = 330;
-        private static final int PANEL_H = 242;
+        private static final int PANEL_W = 360;
+        private static final int PANEL_H = 190;
 
         private HackMenuScreen() {
-            super(Text.literal("AttackAura Menu"));
+            super(Text.literal("Vexion Client"));
         }
 
         @Override
@@ -145,33 +146,27 @@ public final class MctestClient implements ClientModInitializer {
             int left = (width - PANEL_W) / 2;
             int top = (height - PANEL_H) / 2;
             context.fill(left, top, left + PANEL_W, top + PANEL_H, 0xEE111827);
-            context.fill(left, top, left + PANEL_W, top + 26, 0xFF263449);
-            context.drawText(textRenderer, "AttackAura  |  Hack Menu", left + 10, top + 9, 0xFFFFFFFF, false);
-            context.drawText(textRenderer, "Right Shift: close", left + 224, top + 9, 0xFFB9C6D8, false);
+            context.fill(left, top, left + PANEL_W, top + 27, 0xFF263449);
+            context.drawText(textRenderer, "Vexion Client  |  Hack Menu", left + 10, top + 9, 0xFFFFFFFF, false);
+            context.drawText(textRenderer, "Right Shift: close", left + 246, top + 9, 0xFFB9C6D8, false);
 
-            int y = top + 40;
+            int y = top + 42;
             for (String module : BINDS.keySet()) {
                 boolean enabled = ENABLED.get(module);
-                int color = enabled ? 0xFF244D3B : 0xFF263142;
-                context.fill(left + 10, y - 4, left + PANEL_W - 10, y + 20, color);
+                context.fill(left + 10, y - 4, left + PANEL_W - 10, y + 20,
+                        enabled ? 0xFF244D3B : 0xFF263142);
                 context.drawText(textRenderer, module, left + 18, y + 3, 0xFFFFFFFF, false);
                 String bindText = waitingForBind != null && waitingForBind.equals(module)
                         ? "Press a key..." : keyName(BINDS.get(module));
                 context.drawText(textRenderer, "[" + bindText + "]", left + 145, y + 3, 0xFFFFD479, false);
-                context.drawText(textRenderer, enabled ? "ON" : "OFF", left + 285, y + 3,
+                context.drawText(textRenderer, enabled ? "ON" : "OFF", left + 290, y + 3,
                         enabled ? 0xFF71F0A0 : 0xFFB9C6D8, false);
-                y += 31;
+                y += 32;
             }
-
-            context.drawText(textRenderer, "AttackAura range: " + String.format("%.1f", attackRange) + " blocks",
-                    left + 12, top + 145, 0xFFFFFFFF, false);
-            context.fill(left + 12, top + 162, left + 152, top + 184, 0xFF334155);
-            context.fill(left + 166, top + 162, left + 306, top + 184, 0xFF334155);
-            context.drawCenteredTextWithShadow(textRenderer, "- Range", left + 82, top + 169, 0xFFFFFFFF);
-            context.drawCenteredTextWithShadow(textRenderer, "+ Range", left + 236, top + 169, 0xFFFFFFFF);
-            context.drawText(textRenderer, "AttackAura and Fly run in local singleplayer only.",
-                    left + 12, top + 198, 0xFFFFC7A8, false);
-            context.drawText(textRenderer, "X-Ray hides non-ore block faces.", left + 12, top + 213, 0xFFB9C6D8, false);
+            context.drawText(textRenderer, "Left-click: toggle   Middle-click: bind   Right-click: settings",
+                    left + 12, top + 146, 0xFFFFFFFF, false);
+            context.drawText(textRenderer, "Attack Aura test only targets VEXION-TEST-DUMMY armor stands.",
+                    left + 12, top + 163, 0xFFFFC7A8, false);
             super.render(context, mouseX, mouseY, delta);
         }
 
@@ -179,7 +174,7 @@ public final class MctestClient implements ClientModInitializer {
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             int left = (width - PANEL_W) / 2;
             int top = (height - PANEL_H) / 2;
-            int y = top + 36;
+            int y = top + 38;
             for (String module : BINDS.keySet()) {
                 if (mouseX >= left + 10 && mouseX <= left + PANEL_W - 10
                         && mouseY >= y - 4 && mouseY <= y + 20) {
@@ -187,20 +182,12 @@ public final class MctestClient implements ClientModInitializer {
                         waitingForBind = module;
                     } else if (button == 0) {
                         ENABLED.put(module, !ENABLED.get(module));
+                    } else if (button == 1) {
+                        client.setScreen(new ModuleSettingsScreen(module));
                     }
                     return true;
                 }
-                y += 31;
-            }
-            if (button == 0 && mouseY >= top + 162 && mouseY <= top + 184) {
-                if (mouseX >= left + 12 && mouseX <= left + 152) {
-                    attackRange = Math.max(1.0, attackRange - 0.5);
-                    return true;
-                }
-                if (mouseX >= left + 166 && mouseX <= left + 306) {
-                    attackRange = Math.min(6.0, attackRange + 0.5);
-                    return true;
-                }
+                y += 32;
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -219,6 +206,107 @@ public final class MctestClient implements ClientModInitializer {
             }
             if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT || keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 close();
+                return true;
+            }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        @Override
+        public boolean shouldPause() {
+            return false;
+        }
+    }
+
+    private static final class ModuleSettingsScreen extends Screen {
+        private final String module;
+        private ModuleSettingsScreen(String module) {
+            super(Text.literal(module + " Settings"));
+            this.module = module;
+        }
+
+        @Override
+        public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+            renderBackground(context, mouseX, mouseY, delta);
+            int left = (width - 330) / 2;
+            int top = (height - 170) / 2;
+            context.fill(left, top, left + 330, top + 170, 0xEE111827);
+            context.fill(left, top, left + 330, top + 27, 0xFF263449);
+            context.drawText(textRenderer, module + " Settings", left + 10, top + 9, 0xFFFFFFFF, false);
+
+            if ("Attack Aura".equals(module)) {
+                context.drawText(textRenderer, "Test range: " + String.format("%.1f", attackRange) + " blocks",
+                        left + 16, top + 48, 0xFFFFFFFF, false);
+                drawButton(context, left + 16, top + 68, " - Range ");
+                drawButton(context, left + 176, top + 68, " + Range ");
+                context.drawText(textRenderer, "Interval: " + attackIntervalTicks + " ticks",
+                        left + 16, top + 103, 0xFFFFFFFF, false);
+                drawButton(context, left + 16, top + 123, " - Interval ");
+                drawButton(context, left + 176, top + 123, " + Interval ");
+                context.drawText(textRenderer, "Only named test armor stands; no player targeting.",
+                        left + 16, top + 151, 0xFFFFC7A8, false);
+            } else if ("Fly".equals(module)) {
+                context.drawText(textRenderer, "Vertical speed: " + String.format("%.2f", flySpeed),
+                        left + 16, top + 58, 0xFFFFFFFF, false);
+                drawButton(context, left + 16, top + 82, " - Speed ");
+                drawButton(context, left + 176, top + 82, " + Speed ");
+                context.drawText(textRenderer, "Local singleplayer test world only.",
+                        left + 16, top + 120, 0xFFFFC7A8, false);
+            } else {
+                context.drawText(textRenderer, "X-Ray render toggle", left + 16, top + 62, 0xFFFFFFFF, false);
+                context.drawText(textRenderer, "Toggle it in the main module list.",
+                        left + 16, top + 88, 0xFFB9C6D8, false);
+            }
+            super.render(context, mouseX, mouseY, delta);
+        }
+
+        private void drawButton(DrawContext context, int x, int y, String label) {
+            context.fill(x, y, x + 138, y + 20, 0xFF334155);
+            context.drawCenteredTextWithShadow(textRenderer, label, x + 69, y + 6, 0xFFFFFFFF);
+        }
+
+        @Override
+        public boolean mouseClicked(double mouseX, double mouseY, int button) {
+            if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+            int left = (width - 330) / 2;
+            int top = (height - 170) / 2;
+            if ("Attack Aura".equals(module)) {
+                if (inside(mouseX, mouseY, left + 16, top + 68, 138, 20)) {
+                    attackRange = Math.max(1.0, attackRange - 0.5);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 68, 138, 20)) {
+                    attackRange = Math.min(6.0, attackRange + 0.5);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 16, top + 123, 138, 20)) {
+                    attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
+                    attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
+                    return true;
+                }
+            } else if ("Fly".equals(module)) {
+                if (inside(mouseX, mouseY, left + 16, top + 82, 138, 20)) {
+                    flySpeed = Math.max(0.10, flySpeed - 0.05);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 82, 138, 20)) {
+                    flySpeed = Math.min(1.50, flySpeed + 0.05);
+                    return true;
+                }
+            }
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
+        private boolean inside(double x, double y, int bx, int by, int w, int h) {
+            return x >= bx && x <= bx + w && y >= by && y <= by + h;
+        }
+
+        @Override
+        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+                client.setScreen(new HackMenuScreen());
                 return true;
             }
             return super.keyPressed(keyCode, scanCode, modifiers);
