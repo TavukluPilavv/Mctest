@@ -41,8 +41,12 @@ public final class MctestClient implements ClientModInitializer {
             if (client.getWindow() == null) return;
             long handle = client.getWindow().getHandle();
             boolean menuDown = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
-            if (menuDown && !menuWasDown && client.currentScreen == null) {
-                client.setScreen(new HackMenuScreen());
+            if (menuDown && !menuWasDown) {
+                if (client.currentScreen == null) {
+                    client.setScreen(new HackMenuScreen());
+                } else if (client.currentScreen instanceof HackMenuScreen) {
+                    client.setScreen(null);
+                }
             }
             menuWasDown = menuDown;
 
@@ -145,7 +149,7 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            renderBackground(context, mouseX, mouseY, delta);
+            context.fill(0, 0, width, height, 0x66000000);
             int left = (width - PANEL_W) / 2;
             int top = (height - PANEL_H) / 2;
             context.fill(left, top, left + PANEL_W, top + PANEL_H, 0xEE111827);
@@ -207,7 +211,7 @@ public final class MctestClient implements ClientModInitializer {
                 waitingForBind = null;
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT || keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 close();
                 return true;
             }
@@ -308,7 +312,7 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE || keyCode == GLFW.GLFW_KEY_RIGHT_SHIFT) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 client.setScreen(new HackMenuScreen());
                 return true;
             }
