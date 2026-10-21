@@ -28,7 +28,7 @@ public final class MctestClient implements ClientModInitializer {
     private static int attackDelayTicks;
 
     static {
-        for (String module : new String[]{"Attack Aura", "Fly", "X-Ray"}) {
+        for (String module : new String[]{"Attack Aura", "Criticals", "Mobs", "Fly", "X-Ray"}) {
             ENABLED.put(module, false);
             BINDS.put(module, GLFW.GLFW_KEY_UNKNOWN);
             KEY_WAS_DOWN.put(module, false);
@@ -95,7 +95,7 @@ public final class MctestClient implements ClientModInitializer {
                 entity -> entity.isAlive()
                         && player.squaredDistanceTo(entity) <= attackRange * attackRange
         ).stream().findFirst().orElse(null);
-        if (target == null) return;
+        if (target == null || !ENABLED.get("Mobs")) return;
 
         // Aim at the mob's eye position for repeatable anti-cheat testing.
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
@@ -109,10 +109,8 @@ public final class MctestClient implements ClientModInitializer {
         if (attackDelayTicks > 0) {
             attackDelayTicks--;
         } else if (player.getAttackCooldownProgress(0.5F) >= 1.0F) {
-            // Jump on each test hit to exercise jump/critical-hit detection in the local fixture.
-            if (player.isOnGround()) {
-                player.jump();
-            }
+            // Criticals mode only hits while falling after a jump.
+            if (ENABLED.get("Criticals") && (player.isOnGround() || player.getVelocity().y >= 0.0)) return;
             client.interactionManager.attackEntity(player, target);
             player.swingHand(Hand.MAIN_HAND);
             attackDelayTicks = attackIntervalTicks;
@@ -149,7 +147,7 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            context.fill(0, 0, width, height, 0x66000000);
+            context.fill(0, 0, width, height, 0x99000000);
             int left = (width - PANEL_W) / 2;
             int top = (height - PANEL_H) / 2;
             context.fill(left, top, left + PANEL_W, top + PANEL_H, 0xEE111827);
