@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "mctest",
+  "id": "attackaura",
   "version": "${version}",
-  "name": "Mctest",
-  "description": "A client-side Fabric test mod for a private Minecraft 1.21.4 test world.",
+  "name": "AttackAura",
+  "description": "A client-side configurable menu prototype for Minecraft Java 1.21.4 private test worlds.",
   "authors": ["Mctest"],
   "environment": "client",
   "entrypoints": {
