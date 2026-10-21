@@ -2,6 +2,7 @@ package dev.mctest.mixin;
 
 import dev.mctest.MctestClient;
 import net.minecraft.block.BlockState;
+import net.minecraft.registry.Registries;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.block.BlockRenderManager;
 import net.minecraft.client.util.math.MatrixStack;
@@ -22,8 +23,9 @@ public abstract class BlockRenderManagerMixin {
                                          CallbackInfo ci) {
         if (!MctestClient.isXrayEnabled()) return;
 
-        String id = state.getBlock().getTranslationKey();
-        boolean ore = id.contains("_ore") || id.contains("ancient_debris");
+        // Use registry IDs, covering overworld/deepslate and Nether ore variants.
+        String id = Registries.BLOCK.getId(state.getBlock()).getPath();
+        boolean ore = id.endsWith("_ore") || id.equals("ancient_debris");
         if (!ore) ci.cancel();
     }
 }
