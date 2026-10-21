@@ -95,6 +95,7 @@ public final class MctestClient implements ClientModInitializer {
         ).stream().findFirst().orElse(null);
         if (target == null) return;
 
+        // Aim at the dummy's head/eye position for repeatable anti-cheat testing.
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
         double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
@@ -106,6 +107,10 @@ public final class MctestClient implements ClientModInitializer {
         if (attackDelayTicks > 0) {
             attackDelayTicks--;
         } else if (player.getAttackCooldownProgress(0.5F) >= 1.0F) {
+            // Jump on each test hit to exercise jump/critical-hit detection in the local fixture.
+            if (player.isOnGround()) {
+                player.jump();
+            }
             client.interactionManager.attackEntity(player, target);
             player.swingHand(Hand.MAIN_HAND);
             attackDelayTicks = attackIntervalTicks;
@@ -283,7 +288,7 @@ public final class MctestClient implements ClientModInitializer {
                     return true;
                 }
                 if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
-                    attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
+                    attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
                     return true;
                 }
             } else if ("Fly".equals(module)) {
