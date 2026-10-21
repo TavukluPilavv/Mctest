@@ -5,7 +5,8 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
@@ -13,6 +14,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -82,22 +84,32 @@ public final class MctestClient implements ClientModInitializer {
     }
 
     /**
-     * Controlled anti-cheat test: targets hostile mobs in a private singleplayer test world.
-     * It never targets real players and does not implement shield bypass.
+     * Controlled test: targets living entities (players, mobs, iron golems, etc.)
+     * Excludes ArmorStands and self.
      */
     private static void runMobAttackTest(MinecraftClient client) {
         PlayerEntity player = client.player;
         if (player == null || client.world == null || client.interactionManager == null) return;
+        if (!ENABLED.get("Mobs")) return;
 
-        HostileEntity target = client.world.getEntitiesByClass(
-                HostileEntity.class,
+        // LivingEntity kullanarak oyuncuları, demir golemleri ve yaratıkları kapsama aldık.
+        // ArmorStand (zırh askısı) ve oyuncunun kendisi hariç tutuldu.
+        LivingEntity target = client.world.getEntitiesByClass(
+                LivingEntity.class,
                 player.getBoundingBox().expand(attackRange),
                 entity -> entity.isAlive()
+                        && !entity.isRemoved()
+                        && entity != player
+                        && !(entity instanceof ArmorStandEntity)
+                        && player.canSee(entity)
                         && player.squaredDistanceTo(entity) <= attackRange * attackRange
-        ).stream().findFirst().orElse(null);
-        if (target == null || !ENABLED.get("Mobs")) return;
+        ).stream()
+         .min(Comparator.comparingDouble(player::squaredDistanceTo))
+         .orElse(null);
 
-        // Aim at the mob's eye position for repeatable anti-cheat testing.
+        if (target == null) return;
+
+        // Hedefe kilitlenme / bakış açısını ayarlama
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
         double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
@@ -108,13 +120,32 @@ public final class MctestClient implements ClientModInitializer {
 
         if (attackDelayTicks > 0) {
             attackDelayTicks--;
-        } else if (player.getAttackCooldownProgress(0.5F) >= 1.0F) {
-            // Criticals mode only hits while falling after a jump.
-            if (ENABLED.get("Criticals") && (player.isOnGround() || player.getVelocity().y >= 0.0)) return;
-            client.interactionManager.attackEntity(player, target);
-            player.swingHand(Hand.MAIN_HAND);
-            attackDelayTicks = attackIntervalTicks;
+            return;
         }
+
+        // 1. Bekleme süresi (Cooldown) kontrolü: Spam yapmayı engeller.
+        if (player.getAttackCooldownProgress(0.5F) < 1.0F) {
+            return;
+        }
+
+        // 2. Criticals modu kontrolü: Açık ise sadece havada düşüş anında yavaşça vurur.
+        if (ENABLED.get("Criticals")) {
+            boolean isFalling = player.fallDistance > 0.0F
+                    && !player.isOnGround()
+                    && !player.isClimbing()
+                    && !player.isTouchingWater();
+
+            if (!isFalling) {
+                return;
+            }
+        }
+
+        // Saldırıyı gerçekleştir
+        client.interactionManager.attackEntity(player, target);
+        player.swingHand(Hand.MAIN_HAND);
+
+        // Bir sonraki vuruş için bekleme aralığını belirle
+        attackDelayTicks = attackIntervalTicks;
     }
 
     private static void runLocalFly(MinecraftClient client) {
@@ -175,7 +206,7 @@ public final class MctestClient implements ClientModInitializer {
             }
             context.drawText(textRenderer, "Left-click: toggle   Middle-click: bind   Right-click: settings",
                     left + 12, top + 146, 0xFFFFFFFF, false);
-            context.drawText(textRenderer, "Attack Aura test targets hostile mobs in singleplayer only.",
+            context.drawText(textRenderer, "Attack Aura test targets living entities in singleplayer only.",
                     left + 12, top + 163, 0xFFFFC7A8, false);
             super.render(context, mouseX, mouseY, delta);
         }
@@ -257,7 +288,7 @@ public final class MctestClient implements ClientModInitializer {
                         left + 16, top + 103, 0xFFFFFFFF, false);
                 drawButton(context, left + 16, top + 123, " - Interval ");
                 drawButton(context, left + 176, top + 123, " + Interval ");
-                context.drawText(textRenderer, "Hostile mobs only; singleplayer test world.",
+                context.drawText(textRenderer, "Living entities only; singleplayer test world.",
                         left + 16, top + 151, 0xFFFFC7A8, false);
             } else if ("Fly".equals(module)) {
                 context.drawText(textRenderer, "Vertical speed: " + String.format("%.2f", flySpeed),
@@ -290,53 +321,4 @@ public final class MctestClient implements ClientModInitializer {
                     return true;
                 }
                 if (inside(mouseX, mouseY, left + 176, top + 68, 138, 20)) {
-                    attackRange = Math.min(6.0, attackRange + 0.5);
-                    return true;
-                }
-                if (inside(mouseX, mouseY, left + 16, top + 123, 138, 20)) {
-                    attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
-                    return true;
-                }
-                if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
-                    attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
-                    return true;
-                }
-            } else if ("Fly".equals(module)) {
-                if (inside(mouseX, mouseY, left + 16, top + 82, 138, 20)) {
-                    flySpeed = Math.max(0.10, flySpeed - 0.05);
-                    return true;
-                }
-                if (inside(mouseX, mouseY, left + 176, top + 82, 138, 20)) {
-                    flySpeed = Math.min(1.50, flySpeed + 0.05);
-                    return true;
-                }
-            }
-            return super.mouseClicked(mouseX, mouseY, button);
-        }
-
-        private boolean inside(double x, double y, int bx, int by, int w, int h) {
-            return x >= bx && x <= bx + w && y >= by && y <= by + h;
-        }
-
-        @Override
-        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                client.setScreen(new HackMenuScreen());
-                return true;
-            }
-            return super.keyPressed(keyCode, scanCode, modifiers);
-        }
-
-        @Override
-        public boolean shouldPause() {
-            return false;
-        }
-    }
-
-    private static String keyName(int key) {
-        if (key == GLFW.GLFW_KEY_UNKNOWN) return "middle-click to bind";
-        String name = GLFW.glfwGetKeyName(key, 0);
-        if (name != null) return name.toUpperCase();
-        return "KEY " + key;
-    }
-}
+                    attackRange = Math.min(6.0,
