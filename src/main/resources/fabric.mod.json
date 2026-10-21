@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "attackaura",
   "version": "${version}",
-  "name": "AttackAura",
-  "description": "Client-side AttackAura, Fly and X-Ray modules for Minecraft Java 1.21.4 private testing.",
-  "authors": ["Mctest"],
+  "name": "Vexion Client",
+  "description": "Vexion Client modules for Minecraft Java 1.21.4 private testing.",
+  "authors": ["Vexion Client"],
   "environment": "client",
   "entrypoints": {
     "client": [
