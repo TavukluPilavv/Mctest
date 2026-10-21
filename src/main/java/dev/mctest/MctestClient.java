@@ -279,7 +279,7 @@ public final class MctestClient implements ClientModInitializer {
                     return true;
                 }
                 if (inside(mouseX, mouseY, left + 16, top + 123, 138, 20)) {
-                    attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
+                    attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
                     return true;
                 }
                 if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
