@@ -14,7 +14,7 @@ The menu includes **Attack Aura**, **Fly**, and **X-Ray**. Module settings are c
 
 ## Attack Aura test fixture
 
-Attack Aura is deliberately restricted to a local singleplayer world and only targets an armor stand whose custom name is exactly `VEXION-TEST-DUMMY`. It exposes test range and attack-interval settings. It does **not** target real players or implement shield bypass. To test anti-cheat behavior, create a named armor stand in a private test world and review your server's detection/logging separately.
+Attack Aura is deliberately restricted to a local singleplayer world and only targets an armor stand whose custom name is exactly `VEXION-TEST-DUMMY`. It aims at the dummy's eye/head position and jumps when a test hit is triggered, allowing a private-world fixture to exercise aim and jump/critical-hit detection. It exposes test range and attack-interval settings. It does **not** target real players or implement shield bypass. To test anti-cheat behavior, create a named armor stand in a private test world and review your server's detection/logging separately.
 
 ## Fly and X-Ray
 
