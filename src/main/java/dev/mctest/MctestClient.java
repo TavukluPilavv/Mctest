@@ -51,15 +51,19 @@ public final class MctestClient implements ClientModInitializer {
 
     public static final List<String> staffMembers = new ArrayList<>(List.of("Admin_Vexion", "Mod_Ahmet", "Helper_Zeynep"));
 
+    // HUD Konumları ve Sürükleme Değişkenleri
     public static int targetHudX = 100, targetHudY = 40;
     public static int keybindsHudX = 20, keybindsHudY = 100;
     public static int potionsHudX = 20, potionsHudY = 220;
     public static int staffHudX = 200, staffHudY = 100;
+    
+    private static String draggingHud = null;
+    private static int dragOffsetX, dragOffsetY;
 
     static {
         String[] modules = {
                 "Attack Aura", "Fly", "Speed", "X-Ray",
-                "TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD"
+                "TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD", "HUD Editor"
         };
         for (String m : modules) {
             ENABLED.put(m, false);
@@ -116,6 +120,30 @@ public final class MctestClient implements ClientModInitializer {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.player == null || client.world == null) return;
 
+            double mouseX = client.mouse.getX() * client.getWindow().getScaledWidth() / client.getWindow().getWidth();
+            double mouseY = client.mouse.getY() * client.getWindow().getScaledHeight() / client.getWindow().getHeight();
+
+            // HUD Sürükleme ve Düzenleme Mantığı (HUD Editor veya Sağ Tık ile)
+            boolean hudEditorActive = ENABLED.get("HUD Editor");
+            if (hudEditorActive) {
+                if (draggingHud != null) {
+                    if (GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_RELEASE) {
+                        draggingHud = null;
+                    } else {
+                        if (draggingHud.equals("TargetHUD")) { targetHudX = (int)mouseX - dragOffsetX; targetHudY = (int)mouseY - dragOffsetY; }
+                        if (draggingHud.equals("Keybinds HUD")) { keybindsHudX = (int)mouseX - dragOffsetX; keybindsHudY = (int)mouseY - dragOffsetY; }
+                        if (draggingHud.equals("Potions HUD")) { potionsHudX = (int)mouseX - dragOffsetX; potionsHudY = (int)mouseY - dragOffsetY; }
+                        if (draggingHud.equals("Staff HUD")) { staffHudX = (int)mouseX - dragOffsetX; staffHudY = (int)mouseY - dragOffsetY; }
+                    }
+                } else if (GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS) {
+                    if (isInsideBox(mouseX, mouseY, targetHudX, targetHudY, 160, 45)) { draggingHud = "TargetHUD"; dragOffsetX = (int)mouseX - targetHudX; dragOffsetY = (int)mouseY - targetHudY; }
+                    else if (isInsideBox(mouseX, mouseY, keybindsHudX, keybindsHudY, 120, 40)) { draggingHud = "Keybinds HUD"; dragOffsetX = (int)mouseX - keybindsHudX; dragOffsetY = (int)mouseY - keybindsHudY; }
+                    else if (isInsideBox(mouseX, mouseY, potionsHudX, potionsHudY, 130, 40)) { draggingHud = "Potions HUD"; dragOffsetX = (int)mouseX - potionsHudX; dragOffsetY = (int)mouseY - potionsHudY; }
+                    else if (isInsideBox(mouseX, mouseY, staffHudX, staffHudY, 130, 40)) { draggingHud = "Staff HUD"; dragOffsetX = (int)mouseX - staffHudX; dragOffsetY = (int)mouseY - staffHudY; }
+                }
+            }
+
+            // 1. Target HUD
             if (ENABLED.get("TargetHUD") && ENABLED.get("Attack Aura") && currentTarget != null && currentTarget.isAlive()) {
                 context.fill(targetHudX, targetHudY, targetHudX + 160, targetHudY + 45, 0xDD0F172A);
                 context.fill(targetHudX, targetHudY, targetHudX + 160, targetHudY + 3, 0xFF8B5CF6);
@@ -123,6 +151,7 @@ public final class MctestClient implements ClientModInitializer {
                 context.drawText(client.textRenderer, String.format("Can: %.1f / %.1f", currentTarget.getHealth(), currentTarget.getMaxHealth()), targetHudX + 8, targetHudY + 24, 0xFF4ADE80, false);
             }
 
+            // 2. Keybinds HUD
             if (ENABLED.get("Keybinds HUD")) {
                 context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 20 + (countActiveModules() * 12), 0xDD0F172A);
                 context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 2, 0xFFC084FC);
@@ -137,6 +166,7 @@ public final class MctestClient implements ClientModInitializer {
                 }
             }
 
+            // 3. Potions HUD
             if (ENABLED.get("Potions HUD")) {
                 int pCount = client.player.getStatusEffects().size();
                 if (pCount > 0) {
@@ -152,6 +182,7 @@ public final class MctestClient implements ClientModInitializer {
                 }
             }
 
+            // 4. Staff HUD
             if (ENABLED.get("Staff HUD")) {
                 context.fill(staffHudX, staffHudY, staffHudX + 130, staffHudY + 20 + (staffMembers.size() * 12), 0xDD0F172A);
                 context.fill(staffHudX, staffHudY, staffHudX + 130, staffHudY + 2, 0xFFF43F5E);
@@ -163,6 +194,10 @@ public final class MctestClient implements ClientModInitializer {
                 }
             }
         });
+    }
+
+    private static boolean isInsideBox(double mx, double my, int x, int y, int w, int h) {
+        return mx >= x && mx <= x + w && my >= y && my <= y + h;
     }
 
     private void renderTargetIndicator(WorldRenderContext context) {
@@ -200,13 +235,14 @@ public final class MctestClient implements ClientModInitializer {
 
         if (currentTarget == null) return;
 
-        Vec3d delta = currentTarget.getPos().subtract(player.getPos());
+        // Kafaya değil, gövdenin tam merkezine kilitlenme
+        Vec3d targetCenter = currentTarget.getPos().add(0, currentTarget.getHeight() / 2.0, 0);
+        Vec3d delta = targetCenter.subtract(player.getEyePos());
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
 
         if (client.options.forwardKey.isPressed()) {
             player.setYaw(yaw);
         }
-
         player.setHeadYaw(yaw);
 
         if (attackDelayTicks > 0) {
@@ -218,8 +254,7 @@ public final class MctestClient implements ClientModInitializer {
 
         if (criticalsEnabled) {
             boolean isAirborne = !player.isOnGround() && !player.isClimbing() && !player.isTouchingWater();
-            if (!isAirborne) {
-                player.jump();
+            if (!isAirborne || player.fallDistance <= 0.0F) {
                 return;
             }
         }
@@ -314,27 +349,32 @@ public final class MctestClient implements ClientModInitializer {
             int left = (width - W) / 2;
             int top = (height - H) / 2;
 
-            context.fill(left, top, left + W, top + H, 0xFF0F172A);
-            context.fill(left, top, left + W, top + 36, 0xFF1E293B);
-            context.drawText(textRenderer, "Vexion Client | Modern Menu", left + 15, top + 12, 0xFFFFFFFF, false);
+            // Renkli Neon Vexion Teması
+            context.fill(left, top, left + W, top + H, 0xFF0B0F19);
+            context.fill(left, top, left + W, top + 36, 0xFF171F33);
+            context.drawText(textRenderer, "⚡ Vexion Client | Modern Menu", left + 15, top + 12, 0xFFEC4899, false);
 
-            drawColumn(context, left + 15, top + 50, "COMBAT", List.of("Attack Aura"));
-            drawColumn(context, left + 145, top + 50, "MOVEMENT", List.of("Fly", "Speed"));
-            drawColumn(context, left + 275, top + 50, "RENDER", List.of("X-Ray"));
-            drawColumn(context, left + 405, top + 50, "DISPLAY", List.of("TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD"));
+            if (waitingForBind != null) {
+                context.drawCenteredTextWithShadow(textRenderer, "Tuş seçin: " + waitingForBind, width / 2, top + 45, 0xFFF43F5E);
+            }
+
+            drawColumn(context, left + 15, top + 65, "COMBAT", List.of("Attack Aura"));
+            drawColumn(context, left + 145, top + 65, "MOVEMENT", List.of("Fly", "Speed"));
+            drawColumn(context, left + 275, top + 65, "RENDER", List.of("X-Ray"));
+            drawColumn(context, left + 405, top + 65, "DISPLAY", List.of("TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD", "HUD Editor"));
 
             super.render(context, mouseX, mouseY, delta);
         }
 
         private void drawColumn(DrawContext context, int x, int y, String title, List<String> modules) {
-            context.drawText(textRenderer, title, x, y, 0xFFC084FC, false);
+            context.drawText(textRenderer, title, x, y, 0xFF38BDF8, false);
             int mY = y + 16;
             for (String mod : modules) {
                 boolean enabled = ENABLED.get(mod);
-                context.fill(x, mY, x + 110, mY + 24, 0xFF1E293B);
+                context.fill(x, mY, x + 110, mY + 24, 0xFF171F33);
                 context.drawText(textRenderer, mod, x + 6, mY + 8, 0xFFFFFFFF, false);
 
-                context.fill(x + 80, mY + 6, x + 104, mY + 18, enabled ? 0xFF8B5CF6 : 0xFF334155);
+                context.fill(x + 80, mY + 6, x + 104, mY + 18, enabled ? 0xFFEC4899 : 0xFF334155);
                 context.fill(enabled ? x + 92 : x + 82, mY + 8, (enabled ? x + 92 : x + 82) + 10, mY + 16, 0xFFFFFFFF);
                 mY += 30;
             }
@@ -345,10 +385,10 @@ public final class MctestClient implements ClientModInitializer {
             int left = (width - W) / 2;
             int top = (height - H) / 2;
 
-            if (checkClick(mouseX, mouseY, left + 15, top + 66, List.of("Attack Aura"), button)) return true;
-            if (checkClick(mouseX, mouseY, left + 145, top + 66, List.of("Fly", "Speed"), button)) return true;
-            if (checkClick(mouseX, mouseY, left + 275, top + 66, List.of("X-Ray"), button)) return true;
-            if (checkClick(mouseX, mouseY, left + 405, top + 66, List.of("TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 15, top + 81, List.of("Attack Aura"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 145, top + 81, List.of("Fly", "Speed"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 275, top + 81, List.of("X-Ray"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 405, top + 81, List.of("TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD", "HUD Editor"), button)) return true;
 
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -359,7 +399,7 @@ public final class MctestClient implements ClientModInitializer {
                 if (mx >= x && mx <= x + 110 && my >= mY && my <= mY + 24) {
                     if (button == 0) ENABLED.put(mod, !ENABLED.get(mod));
                     else if (button == 1) client.setScreen(new ModuleSettingsScreen(mod));
-                    else if (button == 2) waitingForBind = mod;
+                    else if (button == 2) waitingForBind = mod; // Orta tık ile tuş atama
                     return true;
                 }
                 mY += 30;
