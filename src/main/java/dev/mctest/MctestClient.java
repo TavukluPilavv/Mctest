@@ -6,6 +6,8 @@ import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.mob.MobEntity;
@@ -17,36 +19,54 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 public final class MctestClient implements ClientModInitializer {
     private static boolean menuWasDown;
     private static boolean flyWasRun;
-    
-    // Hile Modülleri
+
+    // Modüller ve Kategoriler
     private static final Map<String, Boolean> ENABLED = new LinkedHashMap<>();
     private static final Map<String, Integer> BINDS = new LinkedHashMap<>();
     private static final Map<String, Boolean> KEY_WAS_DOWN = new LinkedHashMap<>();
 
-    // Değişkenler (flySpeed buraya eklendi)
+    // Combat / Attack Aura Ayarları
     private static double attackRange = 3.5;
     private static int attackIntervalTicks = 10;
     private static int attackDelayTicks;
-    private static double flySpeed = 0.45;
     private static boolean targetPlayers = true;
     private static boolean targetMobs = true;
+    private static boolean criticalsEnabled = true;
     private static boolean shieldBreakEnabled = true;
+
+    // Movement Ayarları
+    private static double flySpeed = 0.45;
+    private static double speedMultiplier = 1.25;
 
     // Hedef (Target HUD için)
     private static LivingEntity currentTarget = null;
 
+    // Alt Hesap Sistemi (Alt Manager)
+    public static final List<String> altAccounts = new ArrayList<>(List.of("Player_Vexion", "TavukluPilav"));
+    public static String activeAccount = "Player_Vexion";
+
+    // HUD Sürükleme Konumları
+    public static int targetHudX = 100, targetHudY = 40;
+    public static int keybindsHudX = 20, keybindsHudY = 100;
+    public static int potionsHudX = 20, potionsHudY = 220;
+    private static String draggingHud = null;
+    private static int dragOffsetX, dragOffsetY;
+
     static {
-        for (String module : new String[]{"Attack Aura", "Criticals", "Fly", "X-Ray", "TargetHUD", "Keybinds HUD", "Potions HUD"}) {
-            ENABLED.put(module, false);
-            BINDS.put(module, GLFW.GLFW_KEY_UNKNOWN);
-            KEY_WAS_DOWN.put(module, false);
+        // Modül listesi (Combat, Movement, Render, Display)
+        String[] modules = {
+                "Attack Aura", "Fly", "Speed", "X-Ray",
+                "TargetHUD", "Keybinds HUD", "Potions HUD"
+        };
+        for (String m : modules) {
+            ENABLED.put(m, false);
+            BINDS.put(m, GLFW.GLFW_KEY_UNKNOWN);
+            KEY_WAS_DOWN.put(m, false);
         }
     }
 
@@ -55,13 +75,12 @@ public final class MctestClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.getWindow() == null) return;
             long handle = client.getWindow().getHandle();
-            
-            // Right Shift menüsü
+
             boolean menuDown = GLFW.glfwGetKey(handle, GLFW.GLFW_KEY_RIGHT_SHIFT) == GLFW.GLFW_PRESS;
             if (menuDown && !menuWasDown) {
                 if (client.currentScreen == null) {
-                    client.setScreen(new HackMenuScreen());
-                } else if (client.currentScreen instanceof HackMenuScreen) {
+                    client.setScreen(new VexionClickGUI());
+                } else if (client.currentScreen instanceof VexionClickGUI) {
                     client.setScreen(null);
                 }
             }
@@ -69,7 +88,6 @@ public final class MctestClient implements ClientModInitializer {
 
             if (client.currentScreen != null) return;
 
-            // Tuş atamalarını dinleme
             for (String module : BINDS.keySet()) {
                 int key = BINDS.get(module);
                 boolean down = key != GLFW.GLFW_KEY_UNKNOWN && GLFW.glfwGetKey(handle, key) == GLFW.GLFW_PRESS;
@@ -85,69 +103,81 @@ public final class MctestClient implements ClientModInitializer {
                 return;
             }
 
-            // Attack Aura Tetikleme
-            if (ENABLED.get("Attack Aura")) {
-                runAttackAura(client);
-            } else {
-                currentTarget = null;
-            }
+            // Hilelerin Çalıştırılması
+            if (ENABLED.get("Attack Aura")) runAttackAura(client);
+            else currentTarget = null;
 
-            // Fly Tetikleme
-            if (ENABLED.get("Fly")) {
-                runLocalFly(client);
-            } else {
-                resetFly(client);
-            }
+            if (ENABLED.get("Fly")) runLocalFly(client);
+            else resetFly(client);
+
+            if (ENABLED.get("Speed")) runSpeed(client);
         });
 
-        // Ekran HUD Çizimleri
+        // HUD Çizimleri ve Sürükleme Mantığı
         HudRenderCallback.EVENT.register((context, tickDelta) -> {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.player == null || client.world == null) return;
 
-            int screenWidth = client.getWindow().getScaledWidth();
-            int screenHeight = client.getWindow().getScaledHeight();
+            double mouseX = client.mouse.getX() * client.getWindow().getScaledWidth() / client.getWindow().getWidth();
+            double mouseY = client.mouse.getY() * client.getWindow().getScaledHeight() / client.getWindow().getHeight();
 
-            // 1. TARGET HUD
-            if (ENABLED.get("TargetHUD") && ENABLED.get("Attack Aura") && currentTarget != null && currentTarget.isAlive()) {
-                int thX = screenWidth / 2 - 75;
-                int thY = 40;
-                context.fill(thX, thY, thX + 150, thY + 40, 0xDD0F172A);
-                context.fill(thX, thY, thX + 150, thY + 2, 0xFF8B5CF6);
-                
-                String targetName = currentTarget.getName().getString();
-                context.drawText(client.textRenderer, targetName, thX + 8, thY + 8, 0xFFFFFFFF, false);
-
-                float hp = currentTarget.getHealth();
-                float maxHp = currentTarget.getMaxHealth();
-                context.drawText(client.textRenderer, String.format("HP: %.1f / %.1f", hp, maxHp), thX + 8, thY + 22, 0xFF4ADE80, false);
+            if (draggingHud != null) {
+                if (GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_RELEASE) {
+                    draggingHud = null;
+                } else {
+                    if (draggingHud.equals("TargetHUD")) { targetHudX = (int)mouseX - dragOffsetX; targetHudY = (int)mouseY - dragOffsetY; }
+                    if (draggingHud.equals("Keybinds HUD")) { keybindsHudX = (int)mouseX - dragOffsetX; keybindsHudY = (int)mouseY - dragOffsetY; }
+                    if (draggingHud.equals("Potions HUD")) { potionsHudX = (int)mouseX - dragOffsetX; potionsHudY = (int)mouseY - dragOffsetY; }
+                }
             }
 
-            // 2. KEYBINDS HUD
+            // 1. Target HUD
+            if (ENABLED.get("TargetHUD") && ENABLED.get("Attack Aura") && currentTarget != null && currentTarget.isAlive()) {
+                context.fill(targetHudX, targetHudY, targetHudX + 160, targetHudY + 45, 0xDD0F172A);
+                context.fill(targetHudX, targetHudY, targetHudX + 160, targetHudY + 3, 0xFF8B5CF6);
+                context.drawText(client.textRenderer, currentTarget.getName().getString(), targetHudX + 8, targetHudY + 8, 0xFFFFFFFF, false);
+                context.drawText(client.textRenderer, String.format("Can: %.1f / %.1f", currentTarget.getHealth(), currentTarget.getMaxHealth()), targetHudX + 8, targetHudY + 24, 0xFF4ADE80, false);
+            }
+
+            // 2. Keybinds HUD (Klavye Simgeli)
             if (ENABLED.get("Keybinds HUD")) {
-                int kbY = 15;
-                context.drawText(client.textRenderer, "Keybinds", screenWidth - 90, kbY, 0xFFC084FC, false);
-                kbY += 12;
+                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 20 + (countActiveModules() * 12), 0xDD0F172A);
+                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 2, 0xFFC084FC);
+                context.drawText(client.textRenderer, "⌨ Keybinds", keybindsHudX + 8, keybindsHudY + 6, 0xFFC084FC, false);
+                int kY = keybindsHudY + 20;
                 for (Map.Entry<String, Boolean> entry : ENABLED.entrySet()) {
                     if (entry.getValue() && !entry.getKey().contains("HUD")) {
                         int key = BINDS.get(entry.getKey());
-                        String kName = (key == GLFW.GLFW_KEY_UNKNOWN) ? "NONE" : keyName(key);
-                        context.drawText(client.textRenderer, entry.getKey() + " [" + kName + "]", screenWidth - 110, kbY, 0xFFE2E8F0, false);
-                        kbY += 10;
+                        context.drawText(client.textRenderer, entry.getKey() + " [" + (key == GLFW.GLFW_KEY_UNKNOWN ? "-" : keyName(key)) + "]", keybindsHudX + 8, kY, 0xFFE2E8F0, false);
+                        kY += 12;
                     }
                 }
             }
 
-            // 3. POTIONS HUD
+            // 3. Potions HUD (İksir Simgeli)
             if (ENABLED.get("Potions HUD")) {
-                int ptY = screenHeight - 60;
-                for (StatusEffectInstance effect : client.player.getStatusEffects()) {
-                    String name = effect.getEffectType().value().getName().getString();
-                    context.drawText(client.textRenderer, name + " " + (effect.getAmplifier() + 1), 10, ptY, 0xFF38BDF8, false);
-                    ptY -= 12;
+                int pCount = client.player.getStatusEffects().size();
+                if (pCount > 0) {
+                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 20 + (pCount * 12), 0xDD0F172A);
+                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 2, 0xFF38BDF8);
+                    context.drawText(client.textRenderer, "🧪 Potions", potionsHudX + 8, potionsHudY + 6, 0xFF38BDF8, false);
+                    int pY = potionsHudY + 20;
+                    for (StatusEffectInstance effect : client.player.getStatusEffects()) {
+                        String name = effect.getEffectType().value().getName().getString();
+                        context.drawText(client.textRenderer, name + " " + (effect.getAmplifier() + 1), potionsHudX + 8, pY, 0xFFE2E8F0, false);
+                        pY += 12;
+                    }
                 }
             }
         });
+    }
+
+    private static int countActiveModules() {
+        int c = 0;
+        for (Map.Entry<String, Boolean> e : ENABLED.entrySet()) {
+            if (e.getValue() && !e.getKey().contains("HUD")) c++;
+        }
+        return c;
     }
 
     public static boolean isXrayEnabled() {
@@ -168,13 +198,11 @@ public final class MctestClient implements ClientModInitializer {
                         && ((targetPlayers && entity instanceof PlayerEntity) || (targetMobs && entity instanceof MobEntity))
                         && player.canSee(entity)
                         && player.squaredDistanceTo(entity) <= attackRange * attackRange
-        ).stream()
-         .min(Comparator.comparingDouble(player::squaredDistanceTo))
-         .orElse(null);
+        ).stream().min(Comparator.comparingDouble(player::squaredDistanceTo)).orElse(null);
 
         if (currentTarget == null) return;
 
-        // F5 Modunda kafa kilitlenmesi (Silent Aim)
+        // F5 Modu için Silent Aim (Kafa ve gövde yönünü hedefe çevirir)
         Vec3d delta = currentTarget.getEyePos().subtract(player.getEyePos());
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
         player.setHeadYaw(yaw);
@@ -185,17 +213,18 @@ public final class MctestClient implements ClientModInitializer {
             return;
         }
 
-        if (player.getAttackCooldownProgress(0.5F) < 0.9F) {
-            return;
-        }
+        if (player.getAttackCooldownProgress(0.5F) < 0.9F) return;
 
-        if (ENABLED.get("Criticals")) {
+        // Kritik Vuruş Mantığı (Açıkken havada düşüş/zıplama anında kesin vurur)
+        if (criticalsEnabled) {
             boolean isAirborne = !player.isOnGround() && !player.isClimbing() && !player.isTouchingWater();
             if (!isAirborne) {
+                player.jump(); // Otomatik zıplayarak kritik şartını tetikler
                 return;
             }
         }
 
+        // Kalkan Kırma (Herhangi bir itemle kalkanı kırar)
         if (shieldBreakEnabled && currentTarget.isBlocking()) {
             client.interactionManager.attackEntity(player, currentTarget);
             player.swingHand(Hand.MAIN_HAND);
@@ -225,13 +254,22 @@ public final class MctestClient implements ClientModInitializer {
         flyWasRun = false;
     }
 
-    private static final class HackMenuScreen extends Screen {
-        private String waitingForBind;
-        private static final int PANEL_W = 380;
-        private static final int PANEL_H = 240;
+    private static void runSpeed(MinecraftClient client) {
+        if (client.player == null) return;
+        if (client.player.horizontalSpeed > 0.01F) {
+            Vec3d vel = client.player.getVelocity();
+            client.player.setVelocity(vel.x * speedMultiplier, vel.y, vel.z * speedMultiplier);
+        }
+    }
 
-        private HackMenuScreen() {
-            super(Text.literal("Vexion Client"));
+    // --- DİKEY KATEGORİKLİ MODERN CLICKGUI ---
+    private static final class VexionClickGUI extends Screen {
+        private String waitingForBind;
+        private static final int W = 520;
+        private static final int H = 320;
+
+        private VexionClickGUI() {
+            super(Text.literal("Vexion Client ClickGUI"));
         }
 
         @Override
@@ -240,48 +278,64 @@ public final class MctestClient implements ClientModInitializer {
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             context.fill(0, 0, width, height, 0x88000000);
-            int left = (width - PANEL_W) / 2;
-            int top = (height - PANEL_H) / 2;
+            int left = (width - W) / 2;
+            int top = (height - H) / 2;
 
-            context.fill(left, top, left + PANEL_W, top + PANEL_H, 0xFF0F172A);
-            context.fill(left, top, left + PANEL_W, top + 32, 0xFF1E293B);
-            context.drawText(textRenderer, "Vexion Client | Menu", left + 12, top + 11, 0xFFFFFFFF, false);
+            // Ana Arka Plan
+            context.fill(left, top, left + W, top + H, 0xFF0F172A);
+            context.fill(left, top, left + W, top + 36, 0xFF1E293B);
+            context.drawText(textRenderer, "Vexion Client | Modern Menu", left + 15, top + 12, 0xFFFFFFFF, false);
 
-            int y = top + 42;
-            for (String module : BINDS.keySet()) {
-                boolean enabled = ENABLED.get(module);
-                context.fill(left + 12, y - 2, left + PANEL_W - 12, y + 20, 0xFF1E293B);
-                context.drawText(textRenderer, module, left + 20, y + 4, 0xFFFFFFFF, false);
+            // Dikey Sütunlar (Combat, Movement, Render, Display)
+            drawColumn(context, left + 15, top + 50, "COMBAT", List.of("Attack Aura"));
+            drawColumn(context, left + 145, top + 50, "MOVEMENT", List.of("Fly", "Speed"));
+            drawColumn(context, left + 275, top + 50, "RENDER", List.of("X-Ray"));
+            drawColumn(context, left + 405, top + 50, "DISPLAY", List.of("TargetHUD", "Keybinds HUD", "Potions HUD"));
 
-                int toggleX = left + 320;
-                int toggleY = y + 2;
-                context.fill(toggleX, toggleY, toggleX + 32, toggleY + 14, enabled ? 0xFF8B5CF6 : 0xFF334155);
-                context.fill(enabled ? toggleX + 18 : toggleX + 2, toggleY + 2, (enabled ? toggleX + 18 : toggleX + 2) + 10, toggleY + 12, 0xFFFFFFFF);
-
-                y += 26;
-            }
             super.render(context, mouseX, mouseY, delta);
+        }
+
+        private void drawColumn(DrawContext context, int x, int y, String title, List<String> modules) {
+            context.drawText(textRenderer, title, x, y, 0xFFC084FC, false);
+            int mY = y + 16;
+            for (String mod : modules) {
+                boolean enabled = ENABLED.get(mod);
+                context.fill(x, mY, x + 110, mY + 24, 0xFF1E293B);
+                context.drawText(textRenderer, mod, x + 6, mY + 8, 0xFFFFFFFF, false);
+
+                // Toggle Kutusu
+                context.fill(x + 80, mY + 6, x + 104, mY + 18, enabled ? 0xFF8B5CF6 : 0xFF334155);
+                context.fill(enabled ? x + 92 : x + 82, mY + 8, (enabled ? x + 92 : x + 82) + 10, mY + 16, 0xFFFFFFFF);
+                mY += 30;
+            }
         }
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            int left = (width - PANEL_W) / 2;
-            int top = (height - PANEL_H) / 2;
-            int y = top + 42;
-            for (String module : BINDS.keySet()) {
-                if (mouseX >= left + 12 && mouseX <= left + PANEL_W - 12 && mouseY >= y - 2 && mouseY <= y + 20) {
-                    if (button == 0) {
-                        ENABLED.put(module, !ENABLED.get(module));
-                    } else if (button == 1) {
-                        client.setScreen(new ModuleSettingsScreen(module));
-                    } else if (button == 2) {
-                        waitingForBind = module;
-                    }
+            int left = (width - W) / 2;
+            int top = (height - H) / 2;
+
+            // Tıklama Kontrolleri (Dikey Sütunlara Göre)
+            if (checkClick(mouseX, mouseY, left + 15, top + 66, List.of("Attack Aura"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 145, top + 66, List.of("Fly", "Speed"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 275, top + 66, List.of("X-Ray"), button)) return true;
+            if (checkClick(mouseX, mouseY, left + 405, top + 66, List.of("TargetHUD", "Keybinds HUD", "Potions HUD"), button)) return true;
+
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
+        private boolean checkClick(double mx, double my, int x, int y, List<String> modules, int button) {
+            int mY = y;
+            for (String mod : modules) {
+                if (mx >= x && mx <= x + 110 && my >= mY && my <= mY + 24) {
+                    if (button == 0) ENABLED.put(mod, !ENABLED.get(mod));
+                    else if (button == 1) client.setScreen(new ModuleSettingsScreen(mod));
+                    else if (button == 2) waitingForBind = mod;
                     return true;
                 }
-                y += 26;
+                mY += 30;
             }
-            return super.mouseClicked(mouseX, mouseY, button);
+            return false;
         }
 
         @Override
@@ -302,10 +356,11 @@ public final class MctestClient implements ClientModInitializer {
         public boolean shouldPause() { return false; }
     }
 
+    // --- MODÜL AYARLARI EKRANI (Sağ Tık) ---
     private static final class ModuleSettingsScreen extends Screen {
         private final String module;
         private ModuleSettingsScreen(String module) {
-            super(Text.literal(module + " Settings"));
+            super(Text.literal(module + " Ayarları"));
             this.module = module;
         }
 
@@ -316,36 +371,39 @@ public final class MctestClient implements ClientModInitializer {
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             context.fill(0, 0, width, height, 0x88000000);
             int left = (width - 320) / 2;
-            int top = (height - 180) / 2;
-            context.fill(left, top, left + 320, top + 180, 0xFF0F172A);
+            int top = (height - 200) / 2;
+            context.fill(left, top, left + 320, top + 200, 0xFF0F172A);
             context.drawText(textRenderer, module + " Ayarları", left + 12, top + 12, 0xFFFFFFFF, false);
 
             if ("Attack Aura".equals(module)) {
-                drawButton(context, left + 16, top + 45, "Oyuncular: " + (targetPlayers ? "AÇIK" : "KAPALI"));
-                drawButton(context, left + 166, top + 45, "Yaratıklar: " + (targetMobs ? "AÇIK" : "KAPALI"));
-                drawButton(context, left + 16, top + 80, "Kalkan Kırma: " + (shieldBreakEnabled ? "AÇIK" : "KAPALI"));
-                drawButton(context, left + 166, top + 80, "Menzil: " + String.format("%.1f", attackRange));
-                drawButton(context, left + 16, top + 115, " - Menzil ");
-                drawButton(context, left + 166, top + 115, " + Menzil ");
+                drawBtn(context, left + 16, top + 45, "Oyuncular: " + (targetPlayers ? "AÇIK" : "KAPALI"));
+                drawBtn(context, left + 166, top + 45, "Yaratıklar: " + (targetMobs ? "AÇIK" : "KAPALI"));
+                drawBtn(context, left + 16, top + 80, "Kritikler: " + (criticalsEnabled ? "AÇIK" : "KAPALI"));
+                drawBtn(context, left + 166, top + 80, "Kalkan Kırma: " + (shieldBreakEnabled ? "AÇIK" : "KAPALI"));
+                drawBtn(context, left + 16, top + 115, "Menzil: " + String.format("%.1f", attackRange));
+            } else if ("Speed".equals(module)) {
+                drawBtn(context, left + 16, top + 45, "Hız Çarpanı: " + String.format("%.2f", speedMultiplier));
             }
             super.render(context, mouseX, mouseY, delta);
         }
 
-        private void drawButton(DrawContext context, int x, int y, String label) {
-            context.fill(x, y, x + 138, y + 22, 0xFF1E293B);
-            context.drawCenteredTextWithShadow(textRenderer, label, x + 69, y + 7, 0xFFFFFFFF);
+        private void drawBtn(DrawContext context, int x, int y, String label) {
+            context.fill(x, y, x + 138, y + 24, 0xFF1E293B);
+            context.drawCenteredTextWithShadow(textRenderer, label, x + 69, y + 8, 0xFFFFFFFF);
         }
 
         @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             int left = (width - 320) / 2;
-            int top = (height - 180) / 2;
+            int top = (height - 200) / 2;
             if ("Attack Aura".equals(module)) {
-                if (inside(mouseX, mouseY, left + 16, top + 45, 138, 22)) targetPlayers = !targetPlayers;
-                if (inside(mouseX, mouseY, left + 166, top + 45, 138, 22)) targetMobs = !targetMobs;
-                if (inside(mouseX, mouseY, left + 16, top + 80, 138, 22)) shieldBreakEnabled = !shieldBreakEnabled;
-                if (inside(mouseX, mouseY, left + 16, top + 115, 138, 22)) attackRange = Math.max(1.0, attackRange - 0.5);
-                if (inside(mouseX, mouseY, left + 166, top + 115, 138, 22)) attackRange = Math.min(8.0, attackRange + 0.5);
+                if (inside(mouseX, mouseY, left + 16, top + 45, 138, 24)) targetPlayers = !targetPlayers;
+                if (inside(mouseX, mouseY, left + 166, top + 45, 138, 24)) targetMobs = !targetMobs;
+                if (inside(mouseX, mouseY, left + 16, top + 80, 138, 24)) criticalsEnabled = !criticalsEnabled;
+                if (inside(mouseX, mouseY, left + 166, top + 80, 138, 24)) shieldBreakEnabled = !shieldBreakEnabled;
+                if (inside(mouseX, mouseY, left + 16, top + 115, 138, 24)) attackRange = attackRange >= 6.0 ? 3.0 : attackRange + 0.5;
+            } else if ("Speed".equals(module)) {
+                if (inside(mouseX, mouseY, left + 16, top + 45, 138, 24)) speedMultiplier = speedMultiplier >= 2.0 ? 1.1 : speedMultiplier + 0.15;
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
@@ -357,7 +415,7 @@ public final class MctestClient implements ClientModInitializer {
         @Override
         public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                client.setScreen(new HackMenuScreen());
+                client.setScreen(new VexionClickGUI());
                 return true;
             }
             return super.keyPressed(keyCode, scanCode, modifiers);
@@ -368,9 +426,8 @@ public final class MctestClient implements ClientModInitializer {
     }
 
     private static String keyName(int key) {
-        if (key == GLFW.GLFW_KEY_UNKNOWN) return "Yok";
+        if (key == GLFW.GLFW_KEY_UNKNOWN) return "-";
         String name = GLFW.glfwGetKeyName(key, 0);
         return name != null ? name.toUpperCase() : "KEY_" + key;
     }
 }
-
