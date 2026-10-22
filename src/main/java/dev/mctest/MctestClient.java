@@ -325,6 +325,8 @@ public final class MctestClient implements ClientModInitializer {
                 drawButton(context, left + 166, top + 45, "Yaratıklar: " + (targetMobs ? "AÇIK" : "KAPALI"));
                 drawButton(context, left + 16, top + 80, "Kalkan Kırma: " + (shieldBreakEnabled ? "AÇIK" : "KAPALI"));
                 drawButton(context, left + 166, top + 80, "Menzil: " + String.format("%.1f", attackRange));
+                drawButton(context, left + 16, top + 115, " - Menzil ");
+                drawButton(context, left + 166, top + 115, " + Menzil ");
             }
             super.render(context, mouseX, mouseY, delta);
         }
@@ -342,6 +344,8 @@ public final class MctestClient implements ClientModInitializer {
                 if (inside(mouseX, mouseY, left + 16, top + 45, 138, 22)) targetPlayers = !targetPlayers;
                 if (inside(mouseX, mouseY, left + 166, top + 45, 138, 22)) targetMobs = !targetMobs;
                 if (inside(mouseX, mouseY, left + 16, top + 80, 138, 22)) shieldBreakEnabled = !shieldBreakEnabled;
+                if (inside(mouseX, mouseY, left + 16, top + 115, 138, 22)) attackRange = Math.max(1.0, attackRange - 0.5);
+                if (inside(mouseX, mouseY, left + 166, top + 115, 138, 22)) attackRange = Math.min(8.0, attackRange + 0.5);
             }
             return super.mouseClicked(mouseX, mouseY, button);
         }
