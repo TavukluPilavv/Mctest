@@ -92,8 +92,6 @@ public final class MctestClient implements ClientModInitializer {
         if (player == null || client.world == null || client.interactionManager == null) return;
         if (!ENABLED.get("Mobs")) return;
 
-        // LivingEntity kullanarak oyuncuları, demir golemleri ve yaratıkları kapsama aldık.
-        // ArmorStand (zırh askısı) ve oyuncunun kendisi hariç tutuldu.
         LivingEntity target = client.world.getEntitiesByClass(
                 LivingEntity.class,
                 player.getBoundingBox().expand(attackRange),
@@ -109,7 +107,6 @@ public final class MctestClient implements ClientModInitializer {
 
         if (target == null) return;
 
-        // Hedefe kilitlenme / bakış açısını ayarlama
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
         double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
@@ -123,12 +120,10 @@ public final class MctestClient implements ClientModInitializer {
             return;
         }
 
-        // 1. Bekleme süresi (Cooldown) kontrolü: Spam yapmayı engeller.
         if (player.getAttackCooldownProgress(0.5F) < 1.0F) {
             return;
         }
 
-        // 2. Criticals modu kontrolü: Açık ise sadece havada düşüş anında yavaşça vurur.
         if (ENABLED.get("Criticals")) {
             boolean isFalling = player.fallDistance > 0.0F
                     && !player.isOnGround()
@@ -140,11 +135,8 @@ public final class MctestClient implements ClientModInitializer {
             }
         }
 
-        // Saldırıyı gerçekleştir
         client.interactionManager.attackEntity(player, target);
         player.swingHand(Hand.MAIN_HAND);
-
-        // Bir sonraki vuruş için bekleme aralığını belirle
         attackDelayTicks = attackIntervalTicks;
     }
 
@@ -321,4 +313,53 @@ public final class MctestClient implements ClientModInitializer {
                     return true;
                 }
                 if (inside(mouseX, mouseY, left + 176, top + 68, 138, 20)) {
-                    attackRange = Math.min(6.0,
+                    attackRange = Math.min(6.0, attackRange + 0.5);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 16, top + 123, 138, 20)) {
+                    attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
+                    attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
+                    return true;
+                }
+            } else if ("Fly".equals(module)) {
+                if (inside(mouseX, mouseY, left + 16, top + 82, 138, 20)) {
+                    flySpeed = Math.max(0.10, flySpeed - 0.05);
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 82, 138, 20)) {
+                    flySpeed = Math.min(1.50, flySpeed + 0.05);
+                    return true;
+                }
+            }
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
+        private boolean inside(double x, double y, int bx, int by, int w, int h) {
+            return x >= bx && x <= bx + w && y >= by && y <= by + h;
+        }
+
+        @Override
+        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                client.setScreen(new HackMenuScreen());
+                return true;
+            }
+            return super.keyPressed(keyCode, scanCode, modifiers);
+        }
+
+        @Override
+        public boolean shouldPause() {
+            return false;
+        }
+    }
+
+    private static String keyName(int key) {
+        if (key == GLFW.GLFW_KEY_UNKNOWN) return "middle-click to bind";
+        String name = GLFW.glfwGetKeyName(key, 0);
+        if (name != null) return name.toUpperCase();
+        return "KEY " + key;
+    }
+}
