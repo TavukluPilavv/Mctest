@@ -186,7 +186,7 @@ public final class VexionTitleScreen extends Screen {
         private VexionButton(int x, int y, int width, int height, Text message, PressAction action) {
             super(x, y, width, height, message, action, DEFAULT_NARRATION_SUPPLIER);
         }
-        static VBuilder builder(Text message, PressAction action) {
+        static VBuilder customBuilder(Text message, PressAction action) {
             return new VBuilder(message, action);
         }
         private static final class VBuilder {
