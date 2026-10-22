@@ -33,7 +33,7 @@ public final class MctestClient implements ClientModInitializer {
     private static final Map<String, Boolean> KEY_WAS_DOWN = new LinkedHashMap<>();
 
     private static double attackRange = 3.5;
-    private static int attackIntervalTicks = 9;
+    private static int attackIntervalTicks = 8;
     private static int attackDelayTicks;
     private static boolean targetPlayers = true;
     private static boolean targetMobs = true;
@@ -134,24 +134,25 @@ public final class MctestClient implements ClientModInitializer {
                         if (draggingHud.equals("Staff HUD")) { staffHudX = (int)mouseX - dragOffsetX; staffHudY = (int)mouseY - dragOffsetY; }
                     }
                 } else if (GLFW.glfwGetMouseButton(client.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS) {
-                    if (isInsideBox(mouseX, mouseY, targetHudX, targetHudY, 160, 45)) { draggingHud = "TargetHUD"; dragOffsetX = (int)mouseX - targetHudX; dragOffsetY = (int)mouseY - targetHudY; }
+                    if (isInsideBox(mouseX, mouseY, targetHudX, targetHudY, 150, 40)) { draggingHud = "TargetHUD"; dragOffsetX = (int)mouseX - targetHudX; dragOffsetY = (int)mouseY - targetHudY; }
                     else if (isInsideBox(mouseX, mouseY, keybindsHudX, keybindsHudY, 120, 40)) { draggingHud = "Keybinds HUD"; dragOffsetX = (int)mouseX - keybindsHudX; dragOffsetY = (int)mouseY - keybindsHudY; }
                     else if (isInsideBox(mouseX, mouseY, potionsHudX, potionsHudY, 130, 40)) { draggingHud = "Potions HUD"; dragOffsetX = (int)mouseX - potionsHudX; dragOffsetY = (int)mouseY - potionsHudY; }
-                    else if (isInsideBox(mouseX, mouseY, staffHudX, staffHudY, 130, 40)) { draggingHud = "Staff HUD"; dragOffsetX = (int)mouseX - staffHudX; dragOffsetY = (int)mouseY - staffHudY; }
+                    else if (isInsideBox(mouseX, mouseY, staffHudX, staffHudY, 120, 40)) { draggingHud = "Staff HUD"; dragOffsetX = (int)mouseX - staffHudX; dragOffsetY = (int)mouseY - staffHudY; }
                 }
             }
 
-            // Gerçekçi Cam Temalı HUD Çizimleri
+            // Target HUD
             if (ENABLED.get("TargetHUD") && ENABLED.get("Attack Aura") && currentTarget != null && currentTarget.isAlive()) {
-                context.fill(targetHudX, targetHudY, targetHudX + 150, targetHudY + 40, 0xC0000000);
-                context.fill(targetHudX, targetHudY, targetHudX + 150, targetHudY + 1, 0xFF7C3AED);
+                context.fill(targetHudX, targetHudY, targetHudX + 150, targetHudY + 40, 0xCC05080E);
+                context.fill(targetHudX, targetHudY, targetHudX + 150, targetHudY + 2, 0xFFEC4899);
                 context.drawText(client.textRenderer, currentTarget.getName().getString(), targetHudX + 6, targetHudY + 6, 0xFFFFFFFF, false);
-                context.drawText(client.textRenderer, String.format("HP: %.1f", currentTarget.getHealth()), targetHudX + 6, targetHudY + 20, 0xFF10B981, false);
+                context.drawText(client.textRenderer, String.format("HP: %.1f / %.1f", currentTarget.getHealth(), currentTarget.getMaxHealth()), targetHudX + 6, targetHudY + 22, 0xFF10B981, false);
             }
 
+            // Keybinds HUD
             if (ENABLED.get("Keybinds HUD")) {
-                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 18 + (countActiveModules() * 11), 0xC0000000);
-                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 1, 0xFF8B5CF6);
+                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 18 + (countActiveModules() * 11), 0xCC05080E);
+                context.fill(keybindsHudX, keybindsHudY, keybindsHudX + 120, keybindsHudY + 2, 0xFF8B5CF6);
                 context.drawText(client.textRenderer, "Keybinds", keybindsHudX + 6, keybindsHudY + 4, 0xFFC084FC, false);
                 int kY = keybindsHudY + 16;
                 for (Map.Entry<String, Boolean> entry : ENABLED.entrySet()) {
@@ -163,12 +164,12 @@ public final class MctestClient implements ClientModInitializer {
                 }
             }
 
-            // Süreli Potions HUD
+            // Potions HUD (Süreler Dahil)
             if (ENABLED.get("Potions HUD")) {
                 Collection<StatusEffectInstance> effects = client.player.getStatusEffects();
                 if (!effects.isEmpty()) {
-                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 18 + (effects.size() * 11), 0xC0000000);
-                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 1, 0xFF06B6D4);
+                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 18 + (effects.size() * 11), 0xCC05080E);
+                    context.fill(potionsHudX, potionsHudY, potionsHudX + 130, potionsHudY + 2, 0xFF06B6D4);
                     context.drawText(client.textRenderer, "Potions", potionsHudX + 6, potionsHudY + 4, 0xFF38BDF8, false);
                     int pY = potionsHudY + 16;
                     for (StatusEffectInstance effect : effects) {
@@ -181,9 +182,10 @@ public final class MctestClient implements ClientModInitializer {
                 }
             }
 
+            // Staff HUD
             if (ENABLED.get("Staff HUD")) {
-                context.fill(staffHudX, staffHudY, staffHudX + 120, staffHudY + 18 + (staffMembers.size() * 11), 0xC0000000);
-                context.fill(staffHudX, staffHudY, staffHudX + 120, staffHudY + 1, 0xFFF43F5E);
+                context.fill(staffHudX, staffHudY, staffHudX + 120, staffHudY + 18 + (staffMembers.size() * 11), 0xCC05080E);
+                context.fill(staffHudX, staffHudY, staffHudX + 120, staffHudY + 2, 0xFFF43F5E);
                 context.drawText(client.textRenderer, "Staff List", staffHudX + 6, staffHudY + 4, 0xFFF43F5E, false);
                 int sY = staffHudY + 16;
                 for (String staff : staffMembers) {
@@ -233,16 +235,15 @@ public final class MctestClient implements ClientModInitializer {
 
         if (currentTarget == null) return;
 
-        // Göğse Kilitlenme (Kafa Yerine Gövde Yüksekliği 0.40)
-        Vec3d chestPos = currentTarget.getPos().add(0, currentTarget.getHeight() * 0.40, 0);
+        // Göğüs hizasına yumuşak kilitlenme (F5'te ve dışarıdan mükemmel görünüm için)
+        Vec3d chestPos = currentTarget.getPos().add(0, currentTarget.getHeight() * 0.45, 0);
         Vec3d delta = chestPos.subtract(player.getEyePos());
-        float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
+        float targetYaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
 
-        // W Tuşu basılıyken hedefe yumuşak yönelme (Silent Rotation / Ekran Sarsılmaz)
-        if (client.options.forwardKey.isPressed()) {
-            player.setYaw(yaw);
-        }
-        player.setHeadYaw(yaw);
+        // Ani sarsıntıları önleyen akıcı açı geçişi (Smooth Interpolation)
+        float smoothedYaw = MathHelper.lerpAngleDegrees(0.35f, player.getYaw(), targetYaw);
+        player.setYaw(smoothedYaw);
+        player.setHeadYaw(smoothedYaw);
 
         if (attackDelayTicks > 0) {
             attackDelayTicks--;
@@ -251,7 +252,7 @@ public final class MctestClient implements ClientModInitializer {
 
         if (player.getAttackCooldownProgress(0.5F) < 0.9F) return;
 
-        // Manuel Kritik Kontrolü (Zıplayıp düşüş anında vurur)
+        // Manuel zıplama ile tam uyumlu kritik vuruş kontrolü (Düşüş anında vurur)
         if (criticalsEnabled) {
             boolean isAirborne = !player.isOnGround() && !player.isClimbing() && !player.isTouchingWater();
             if (!isAirborne || player.fallDistance <= 0.0F) {
@@ -303,12 +304,12 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-            context.fill(0, 0, width, height, 0xFF090D16);
+            context.fill(0, 0, width, height, 0xFF05080E);
 
             ZonedDateTime trTime = ZonedDateTime.now(ZoneId.of("Europe/Istanbul"));
             String timeStr = trTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
-            context.drawCenteredTextWithShadow(textRenderer, "Vexion Client v1.0 | TSI: " + timeStr, width / 2, 12, 0xFFA855F7);
+            context.drawCenteredTextWithShadow(textRenderer, "Vexion Client v1.0 | TSI: " + timeStr, width / 2, 12, 0xFFEC4899);
 
             int btnX = width / 2 - 90;
             int btnY = height / 2 - 15;
@@ -349,9 +350,9 @@ public final class MctestClient implements ClientModInitializer {
             int left = (width - W) / 2;
             int top = (height - H) / 2;
 
-            context.fill(left, top, left + W, top + H, 0xF0090D16);
+            context.fill(left, top, left + W, top + H, 0xF505080E);
             context.fill(left, top, left + W, top + 28, 0xFF111827);
-            context.drawText(textRenderer, "Vexion Client | Modern Menu", left + 12, top + 10, 0xFFC084FC, false);
+            context.drawText(textRenderer, "Vexion Client | Modern Menu", left + 12, top + 10, 0xFFEC4899, false);
 
             if (waitingForBind != null) {
                 context.drawCenteredTextWithShadow(textRenderer, "Tuş seçin: " + waitingForBind, width / 2, top + 35, 0xFFF43F5E);
@@ -373,7 +374,7 @@ public final class MctestClient implements ClientModInitializer {
                 context.fill(x, mY, x + 100, mY + 20, 0xFF1F2937);
                 context.drawText(textRenderer, mod, x + 5, mY + 6, 0xFFFFFFFF, false);
 
-                context.fill(x + 75, mY + 4, x + 95, mY + 16, enabled ? 0xFFA855F7 : 0xFF374151);
+                context.fill(x + 75, mY + 4, x + 95, mY + 16, enabled ? 0xFFEC4899 : 0xFF374151);
                 context.fill(enabled ? x + 85 : x + 77, mY + 6, (enabled ? x + 85 : x + 77) + 8, mY + 14, 0xFFFFFFFF);
                 mY += 25;
             }
@@ -424,7 +425,6 @@ public final class MctestClient implements ClientModInitializer {
         public boolean shouldPause() { return false; }
     }
 
-    // Listeli Gerçekçi Ayarlar Ekranı
     private static final class ModuleSettingsScreen extends Screen {
         private final String module;
         private ModuleSettingsScreen(String module) {
@@ -440,8 +440,8 @@ public final class MctestClient implements ClientModInitializer {
             context.fill(0, 0, width, height, 0x88000000);
             int left = (width - 240) / 2;
             int top = (height - 180) / 2;
-            context.fill(left, top, left + 240, top + 180, 0xF0090D16);
-            context.drawText(textRenderer, module + " Ayarları", left + 10, top + 10, 0xFFC084FC, false);
+            context.fill(left, top, left + 240, top + 180, 0xF505080E);
+            context.drawText(textRenderer, module + " Ayarları", left + 10, top + 10, 0xFFEC4899, false);
 
             if ("Attack Aura".equals(module)) {
                 drawListRow(context, left + 10, top + 35, "• Oyuncular", targetPlayers ? "AÇIK" : "KAPALI");
@@ -458,7 +458,7 @@ public final class MctestClient implements ClientModInitializer {
         private void drawListRow(DrawContext context, int x, int y, String title, String val) {
             context.fill(x, y, x + 220, y + 20, 0xFF1F2937);
             context.drawText(textRenderer, title, x + 8, y + 6, 0xFFE2E8F0, false);
-            context.drawText(textRenderer, val, x + 160, y + 6, 0xFFA855F7, false);
+            context.drawText(textRenderer, val, x + 150, y + 6, 0xFFEC4899, false);
         }
 
         @Override
