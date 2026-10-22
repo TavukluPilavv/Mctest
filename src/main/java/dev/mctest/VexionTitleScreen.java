@@ -98,18 +98,18 @@ public final class VexionTitleScreen extends Screen {
                 clearAndInit();
             }).dimensions(center + 5, height / 2 - 32, 125, 23).build());
         } else {
-            addDrawableChild(VexionButton.builder(Text.literal("Tek Oyunculu"), b -> client.setScreen(new SelectWorldScreen(this)))
+            addDrawableChild(VexionButton.customBuilder(Text.literal("Tek Oyunculu"), b -> client.setScreen(new SelectWorldScreen(this)))
                     .dimensions(left, height / 2 - 38, buttonWidth, 25).build());
-            addDrawableChild(VexionButton.builder(Text.literal("Çok Oyunculu"), b -> client.setScreen(new MultiplayerScreen(this)))
+            addDrawableChild(VexionButton.customBuilder(Text.literal("Çok Oyunculu"), b -> client.setScreen(new MultiplayerScreen(this)))
                     .dimensions(left, height / 2 - 7, buttonWidth, 25).build());
-            addDrawableChild(VexionButton.builder(Text.literal("Ayarlar"), b -> client.setScreen(new OptionsScreen(this, client.options)))
+            addDrawableChild(VexionButton.customBuilder(Text.literal("Ayarlar"), b -> client.setScreen(new OptionsScreen(this, client.options)))
                     .dimensions(left, height / 2 + 24, buttonWidth, 25).build());
-            addDrawableChild(VexionButton.builder(Text.literal("Hesap Değiştir"), b -> {
+            addDrawableChild(VexionButton.customBuilder(Text.literal("Hesap Değiştir"), b -> {
                 accountScreen = true;
                 notice = "";
                 clearAndInit();
             }).dimensions(left, height / 2 + 55, buttonWidth, 25).build());
-            addDrawableChild(VexionButton.builder(Text.literal("Çıkış"), b -> client.scheduleStop())
+            addDrawableChild(VexionButton.customBuilder(Text.literal("Çıkış"), b -> client.scheduleStop())
                     .dimensions(left, height / 2 + 86, buttonWidth, 25).build());
         }
     }
