@@ -186,8 +186,18 @@ public final class VexionTitleScreen extends Screen {
         private VexionButton(int x, int y, int width, int height, Text message, PressAction action) {
             super(x, y, width, height, message, action, DEFAULT_NARRATION_SUPPLIER);
         }
-        static VexionButton builder(Text message, PressAction action) {
-            return new VexionButton(0, 0, 200, 20, message, action);
+        static VBuilder builder(Text message, PressAction action) {
+            return new VBuilder(message, action);
+        }
+        private static final class VBuilder {
+            private final Text message;
+            private final PressAction action;
+            private int x, y, width = 200, height = 20;
+            private VBuilder(Text message, PressAction action) { this.message = message; this.action = action; }
+            private VBuilder dimensions(int x, int y, int width, int height) {
+                this.x = x; this.y = y; this.width = width; this.height = height; return this;
+            }
+            private VexionButton build() { return new VexionButton(x, y, width, height, message, action); }
         }
         @Override
         protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
