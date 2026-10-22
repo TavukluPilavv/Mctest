@@ -8,6 +8,7 @@ import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.decoration.ArmorStandEntity;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.AxeItem;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
@@ -28,6 +29,9 @@ public final class MctestClient implements ClientModInitializer {
     private static int attackIntervalTicks = 10;
     private static double flySpeed = 0.45;
     private static int attackDelayTicks;
+
+    // Özel modül ayarları
+    private static boolean shieldBreakEnabled = true;
 
     static {
         for (String module : new String[]{"Attack Aura", "Criticals", "Mobs", "Fly", "X-Ray"}) {
@@ -68,14 +72,10 @@ public final class MctestClient implements ClientModInitializer {
                 return;
             }
 
-            // Movement and automated test actions are intentionally limited to local singleplayer.
-            if (client.isInSingleplayer()) {
-                if (ENABLED.get("Attack Aura")) runMobAttackTest(client);
-                if (ENABLED.get("Fly")) runLocalFly(client);
-                else resetFly(client);
-            } else {
-                resetFly(client);
-            }
+            // Multiplayer kısıtlaması kaldırıldı; her yerde çalışır.
+            if (ENABLED.get("Attack Aura")) runMobAttackTest(client);
+            if (ENABLED.get("Fly")) runLocalFly(client);
+            else resetFly(client);
         });
     }
 
@@ -83,15 +83,11 @@ public final class MctestClient implements ClientModInitializer {
         return ENABLED.get("X-Ray");
     }
 
-    /**
-     * Controlled test: targets living entities (players, mobs, iron golems, etc.)
-     * Excludes ArmorStands and self.
-     */
     private static void runMobAttackTest(MinecraftClient client) {
         PlayerEntity player = client.player;
         if (player == null || client.world == null || client.interactionManager == null) return;
-        if (!ENABLED.get("Mobs")) return;
 
+        // Hem oyuncular hem yaratıklar hedef alınabilir.
         LivingEntity target = client.world.getEntitiesByClass(
                 LivingEntity.class,
                 player.getBoundingBox().expand(attackRange),
@@ -107,23 +103,23 @@ public final class MctestClient implements ClientModInitializer {
 
         if (target == null) return;
 
+        // SILENT AIM: Ekran kamerasını dönmesini engelleyip sadece kafa/gövde açısını hedefe kilitliyoruz (F5'te gözükür).
         Vec3d delta = target.getEyePos().subtract(player.getEyePos());
-        double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
-        float pitch = (float) -(MathHelper.atan2(delta.y, horizontal) * (180.0 / Math.PI));
-        player.setYaw(yaw);
-        player.setPitch(pitch);
         player.setHeadYaw(yaw);
+        player.setBodyYaw(yaw);
 
         if (attackDelayTicks > 0) {
             attackDelayTicks--;
             return;
         }
 
+        // Saldırı bekleme süresi dolmadıysa bekle (Spam atmaz)
         if (player.getAttackCooldownProgress(0.5F) < 1.0F) {
             return;
         }
 
+        // Criticals Modu: Açık ise sadece oyuncu havada düşüş aşamasındayken tam kritik vurur.
         if (ENABLED.get("Criticals")) {
             boolean isFalling = player.fallDistance > 0.0F
                     && !player.isOnGround()
@@ -135,9 +131,23 @@ public final class MctestClient implements ClientModInitializer {
             }
         }
 
+        // Kalkan Kırma (Shield Break): Hedef kalkan kullanıyorsa envanterdeki baltaya geçer
+        if (shieldBreakEnabled && target.isBlocking()) {
+            switchToAxe(player);
+        }
+
         client.interactionManager.attackEntity(player, target);
         player.swingHand(Hand.MAIN_HAND);
         attackDelayTicks = attackIntervalTicks;
+    }
+
+    private static void switchToAxe(PlayerEntity player) {
+        for (int i = 0; i < 9; i++) {
+            if (player.getInventory().getStack(i).getItem() instanceof AxeItem) {
+                player.getInventory().selectedSlot = i;
+                break;
+            }
+        }
     }
 
     private static void runLocalFly(MinecraftClient client) {
@@ -170,7 +180,6 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-            // Intentionally skip Minecraft's blurred menu background.
         }
 
         @Override
@@ -198,8 +207,6 @@ public final class MctestClient implements ClientModInitializer {
             }
             context.drawText(textRenderer, "Left-click: toggle   Middle-click: bind   Right-click: settings",
                     left + 12, top + 146, 0xFFFFFFFF, false);
-            context.drawText(textRenderer, "Attack Aura test targets living entities in singleplayer only.",
-                    left + 12, top + 163, 0xFFFFC7A8, false);
             super.render(context, mouseX, mouseY, delta);
         }
 
@@ -259,36 +266,35 @@ public final class MctestClient implements ClientModInitializer {
 
         @Override
         public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-            // Intentionally skip Minecraft's blurred menu background.
         }
 
         @Override
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             context.fill(0, 0, width, height, 0x66000000);
             int left = (width - 330) / 2;
-            int top = (height - 170) / 2;
-            context.fill(left, top, left + 330, top + 170, 0xEE111827);
+            int top = (height - 200) / 2;
+            context.fill(left, top, left + 330, top + 200, 0xEE111827);
             context.fill(left, top, left + 330, top + 27, 0xFF263449);
             context.drawText(textRenderer, module + " Settings", left + 10, top + 9, 0xFFFFFFFF, false);
 
             if ("Attack Aura".equals(module)) {
-                context.drawText(textRenderer, "Test range: " + String.format("%.1f", attackRange) + " blocks",
-                        left + 16, top + 48, 0xFFFFFFFF, false);
-                drawButton(context, left + 16, top + 68, " - Range ");
-                drawButton(context, left + 176, top + 68, " + Range ");
+                context.drawText(textRenderer, "Range: " + String.format("%.1f", attackRange) + " blocks",
+                        left + 16, top + 38, 0xFFFFFFFF, false);
+                drawButton(context, left + 16, top + 52, " - Range ");
+                drawButton(context, left + 176, top + 52, " + Range ");
+
+                drawButton(context, left + 16, top + 82, "Criticals: " + (ENABLED.get("Criticals") ? "ON" : "OFF"));
+                drawButton(context, left + 176, top + 82, "ShieldBreak: " + (shieldBreakEnabled ? "ON" : "OFF"));
+
                 context.drawText(textRenderer, "Interval: " + attackIntervalTicks + " ticks",
-                        left + 16, top + 103, 0xFFFFFFFF, false);
-                drawButton(context, left + 16, top + 123, " - Interval ");
-                drawButton(context, left + 176, top + 123, " + Interval ");
-                context.drawText(textRenderer, "Living entities only; singleplayer test world.",
-                        left + 16, top + 151, 0xFFFFC7A8, false);
+                        left + 16, top + 115, 0xFFFFFFFF, false);
+                drawButton(context, left + 16, top + 130, " - Interval ");
+                drawButton(context, left + 176, top + 130, " + Interval ");
             } else if ("Fly".equals(module)) {
                 context.drawText(textRenderer, "Vertical speed: " + String.format("%.2f", flySpeed),
                         left + 16, top + 58, 0xFFFFFFFF, false);
                 drawButton(context, left + 16, top + 82, " - Speed ");
                 drawButton(context, left + 176, top + 82, " + Speed ");
-                context.drawText(textRenderer, "Local singleplayer test world only.",
-                        left + 16, top + 120, 0xFFFFC7A8, false);
             } else {
                 context.drawText(textRenderer, "X-Ray render toggle", left + 16, top + 62, 0xFFFFFFFF, false);
                 context.drawText(textRenderer, "Toggle it in the main module list.",
@@ -306,21 +312,29 @@ public final class MctestClient implements ClientModInitializer {
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
             int left = (width - 330) / 2;
-            int top = (height - 170) / 2;
+            int top = (height - 200) / 2;
             if ("Attack Aura".equals(module)) {
-                if (inside(mouseX, mouseY, left + 16, top + 68, 138, 20)) {
+                if (inside(mouseX, mouseY, left + 16, top + 52, 138, 20)) {
                     attackRange = Math.max(1.0, attackRange - 0.5);
                     return true;
                 }
-                if (inside(mouseX, mouseY, left + 176, top + 68, 138, 20)) {
+                if (inside(mouseX, mouseY, left + 176, top + 52, 138, 20)) {
                     attackRange = Math.min(6.0, attackRange + 0.5);
                     return true;
                 }
-                if (inside(mouseX, mouseY, left + 16, top + 123, 138, 20)) {
+                if (inside(mouseX, mouseY, left + 16, top + 82, 138, 20)) {
+                    ENABLED.put("Criticals", !ENABLED.get("Criticals"));
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 176, top + 82, 138, 20)) {
+                    shieldBreakEnabled = !shieldBreakEnabled;
+                    return true;
+                }
+                if (inside(mouseX, mouseY, left + 16, top + 130, 138, 20)) {
                     attackIntervalTicks = Math.max(1, attackIntervalTicks - 1);
                     return true;
                 }
-                if (inside(mouseX, mouseY, left + 176, top + 123, 138, 20)) {
+                if (inside(mouseX, mouseY, left + 176, top + 130, 138, 20)) {
                     attackIntervalTicks = Math.min(40, attackIntervalTicks + 1);
                     return true;
                 }
