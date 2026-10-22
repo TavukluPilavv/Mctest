@@ -213,12 +213,11 @@ public final class MctestClient implements ClientModInitializer {
 
         if (currentTarget == null) return;
 
-        // Hedefe Yönelme ve W ile Takip Mantığı
         Vec3d delta = currentTarget.getPos().subtract(player.getPos());
         float yaw = (float) (MathHelper.atan2(delta.z, delta.x) * (180.0 / Math.PI)) - 90.0F;
 
         if (client.options.forwardKey.isPressed()) {
-            player.setYaw(yaw); // W'ye basarken vücudu ve yürüyüş yönünü hedefe çevirir
+            player.setYaw(yaw);
         }
 
         player.setHeadYaw(yaw);
@@ -285,14 +284,11 @@ public final class MctestClient implements ClientModInitializer {
         public void render(DrawContext context, int mouseX, int mouseY, float delta) {
             context.fill(0, 0, width, height, 0xFF0F172A);
 
-            // TR Saati Hesabı
             ZonedDateTime trTime = ZonedDateTime.now(ZoneId.of("Europe/Istanbul"));
             String timeStr = trTime.format(DateTimeFormatter.ofPattern("HH:mm:ss"));
 
-            // Başlık Bilgisi
             context.drawCenteredTextWithShadow(textRenderer, "Vexion Client v1.0 | TR Saati: " + timeStr, width / 2, 15, 0xFFC084FC);
 
-            // Hesap Değiştirme Butonu (Settings Üstü)
             int btnX = width / 2 - 100;
             int btnY = height / 2 - 20;
             context.fill(btnX, btnY, btnX + 200, btnY + 25, 0xFF1E293B);
@@ -325,4 +321,30 @@ public final class MctestClient implements ClientModInitializer {
         }
 
         @Override
-        public void render
+        public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {}
+
+        @Override
+        public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+            context.fill(0, 0, width, height, 0x88000000);
+            int left = (width - W) / 2;
+            int top = (height - H) / 2;
+
+            context.fill(left, top, left + W, top + H, 0xFF0F172A);
+            context.fill(left, top, left + W, top + 36, 0xFF1E293B);
+            context.drawText(textRenderer, "Vexion Client | Modern Menu", left + 15, top + 12, 0xFFFFFFFF, false);
+
+            drawColumn(context, left + 15, top + 50, "COMBAT", List.of("Attack Aura"));
+            drawColumn(context, left + 145, top + 50, "MOVEMENT", List.of("Fly", "Speed"));
+            drawColumn(context, left + 275, top + 50, "RENDER", List.of("X-Ray"));
+            drawColumn(context, left + 405, top + 50, "DISPLAY", List.of("TargetHUD", "Keybinds HUD", "Potions HUD", "Staff HUD"));
+
+            super.render(context, mouseX, mouseY, delta);
+        }
+
+        private void drawColumn(DrawContext context, int x, int y, String title, List<String> modules) {
+            context.drawText(textRenderer, title, x, y, 0xFFC084FC, false);
+            int mY = y + 16;
+            for (String mod : modules) {
+                boolean enabled = ENABLED.get(mod);
+                context.fill(x, mY, x + 110, mY + 24, 0xFF1E293B);
+                context.drawText(textRenderer
