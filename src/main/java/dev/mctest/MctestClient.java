@@ -30,10 +30,11 @@ public final class MctestClient implements ClientModInitializer {
     private static final Map<String, Integer> BINDS = new LinkedHashMap<>();
     private static final Map<String, Boolean> KEY_WAS_DOWN = new LinkedHashMap<>();
 
-    // Attack Aura Özel Ayarları
+    // Değişkenler (flySpeed buraya eklendi)
     private static double attackRange = 3.5;
     private static int attackIntervalTicks = 10;
     private static int attackDelayTicks;
+    private static double flySpeed = 0.45;
     private static boolean targetPlayers = true;
     private static boolean targetMobs = true;
     private static boolean shieldBreakEnabled = true;
@@ -42,7 +43,6 @@ public final class MctestClient implements ClientModInitializer {
     private static LivingEntity currentTarget = null;
 
     static {
-        // Mobs kaldırıldı, HUD elemanları eklendi
         for (String module : new String[]{"Attack Aura", "Criticals", "Fly", "X-Ray", "TargetHUD", "Keybinds HUD", "Potions HUD"}) {
             ENABLED.put(module, false);
             BINDS.put(module, GLFW.GLFW_KEY_UNKNOWN);
@@ -158,7 +158,6 @@ public final class MctestClient implements ClientModInitializer {
         PlayerEntity player = client.player;
         if (player == null || client.world == null || client.interactionManager == null) return;
 
-        // Filtreleme: Mobs ve Oyuncular ayarlara göre hedeflenir
         currentTarget = client.world.getEntitiesByClass(
                 LivingEntity.class,
                 player.getBoundingBox().expand(attackRange),
@@ -186,20 +185,17 @@ public final class MctestClient implements ClientModInitializer {
             return;
         }
 
-        // Vuruş Zamanlaması (Cooldown)
         if (player.getAttackCooldownProgress(0.5F) < 0.9F) {
             return;
         }
 
-        // CRITICALS DÜZELTMESİ: Oyuncu zıpladıktan sonra havada (y hızı <= 0) olduğu an vurur
         if (ENABLED.get("Criticals")) {
             boolean isAirborne = !player.isOnGround() && !player.isClimbing() && !player.isTouchingWater();
             if (!isAirborne) {
-                return; // Zıplayana kadar bekle
+                return;
             }
         }
 
-        // KALKAN KIRMA: Herhangi bir item tutarken kalkanı kırar
         if (shieldBreakEnabled && currentTarget.isBlocking()) {
             client.interactionManager.attackEntity(player, currentTarget);
             player.swingHand(Hand.MAIN_HAND);
@@ -229,7 +225,6 @@ public final class MctestClient implements ClientModInitializer {
         flyWasRun = false;
     }
 
-    // MODERN HACK MENÜSÜ
     private static final class HackMenuScreen extends Screen {
         private String waitingForBind;
         private static final int PANEL_W = 380;
@@ -258,7 +253,6 @@ public final class MctestClient implements ClientModInitializer {
                 context.fill(left + 12, y - 2, left + PANEL_W - 12, y + 20, 0xFF1E293B);
                 context.drawText(textRenderer, module, left + 20, y + 4, 0xFFFFFFFF, false);
 
-                // Toggle Kutusu
                 int toggleX = left + 320;
                 int toggleY = y + 2;
                 context.fill(toggleX, toggleY, toggleX + 32, toggleY + 14, enabled ? 0xFF8B5CF6 : 0xFF334155);
@@ -308,7 +302,6 @@ public final class MctestClient implements ClientModInitializer {
         public boolean shouldPause() { return false; }
     }
 
-    // AYARLAR EKRANI
     private static final class ModuleSettingsScreen extends Screen {
         private final String module;
         private ModuleSettingsScreen(String module) {
@@ -329,7 +322,7 @@ public final class MctestClient implements ClientModInitializer {
 
             if ("Attack Aura".equals(module)) {
                 drawButton(context, left + 16, top + 45, "Oyuncular: " + (targetPlayers ? "AÇIK" : "KAPALI"));
-                drawButton(context, left + 166, top + 45, "Yaratıklar (Mobs): " + (targetMobs ? "AÇIK" : "KAPALI"));
+                drawButton(context, left + 166, top + 45, "Yaratıklar: " + (targetMobs ? "AÇIK" : "KAPALI"));
                 drawButton(context, left + 16, top + 80, "Kalkan Kırma: " + (shieldBreakEnabled ? "AÇIK" : "KAPALI"));
                 drawButton(context, left + 166, top + 80, "Menzil: " + String.format("%.1f", attackRange));
             }
@@ -376,3 +369,4 @@ public final class MctestClient implements ClientModInitializer {
         return name != null ? name.toUpperCase() : "KEY_" + key;
     }
 }
+
