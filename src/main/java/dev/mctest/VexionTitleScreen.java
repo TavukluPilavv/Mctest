@@ -98,18 +98,18 @@ public final class VexionTitleScreen extends Screen {
                 clearAndInit();
             }).dimensions(center + 5, height / 2 - 32, 125, 23).build());
         } else {
-            addDrawableChild(ButtonWidget.builder(Text.literal("Tek Oyunculu"), b -> client.setScreen(new SelectWorldScreen(this)))
+            addDrawableChild(VexionButton.builder(Text.literal("Tek Oyunculu"), b -> client.setScreen(new SelectWorldScreen(this)))
                     .dimensions(left, height / 2 - 38, buttonWidth, 25).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Çok Oyunculu"), b -> client.setScreen(new MultiplayerScreen(this)))
+            addDrawableChild(VexionButton.builder(Text.literal("Çok Oyunculu"), b -> client.setScreen(new MultiplayerScreen(this)))
                     .dimensions(left, height / 2 - 7, buttonWidth, 25).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Ayarlar"), b -> client.setScreen(new OptionsScreen(this, client.options)))
+            addDrawableChild(VexionButton.builder(Text.literal("Ayarlar"), b -> client.setScreen(new OptionsScreen(this, client.options)))
                     .dimensions(left, height / 2 + 24, buttonWidth, 25).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Hesap Değiştir"), b -> {
+            addDrawableChild(VexionButton.builder(Text.literal("Hesap Değiştir"), b -> {
                 accountScreen = true;
                 notice = "";
                 clearAndInit();
             }).dimensions(left, height / 2 + 55, buttonWidth, 25).build());
-            addDrawableChild(ButtonWidget.builder(Text.literal("Çıkış"), b -> client.scheduleStop())
+            addDrawableChild(VexionButton.builder(Text.literal("Çıkış"), b -> client.scheduleStop())
                     .dimensions(left, height / 2 + 86, buttonWidth, 25).build());
         }
     }
@@ -118,7 +118,7 @@ public final class VexionTitleScreen extends Screen {
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         // Keep Minecraft's own panorama/blur background and add a cinematic dark overlay.
         renderBackground(context, mouseX, mouseY, delta);
-        context.fillGradient(0, 0, width, height, 0x66101B2B, 0xAA05070C);
+        context.fillGradient(0, 0, width, height, 0x22101B2B, 0x5505070C);
         context.fill(0, 0, width, 34, 0x66050912);
         context.drawCenteredTextWithShadow(textRenderer, Text.literal("Vexion Client - 1.21.4"), width / 2, Math.max(18, height / 2 - 112), 0xFFFFFFFF);
         context.drawTextWithShadow(textRenderer, "Türkiye saati  " + LocalTime.now(ZoneId.of("Europe/Istanbul")).format(CLOCK), 12, 12, 0xFFFFFFFF);
@@ -180,6 +180,24 @@ public final class VexionTitleScreen extends Screen {
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private static final class VexionButton extends ButtonWidget {
+        private VexionButton(int x, int y, int width, int height, Text message, PressAction action) {
+            super(x, y, width, height, message, action, DEFAULT_NARRATION_SUPPLIER);
+        }
+        static VexionButton builder(Text message, PressAction action) {
+            return new VexionButton(0, 0, 200, 20, message, action);
+        }
+        @Override
+        protected void renderWidget(DrawContext context, int mouseX, int mouseY, float delta) {
+            boolean hovered = isHovered();
+            context.fill(getX() + 2, getY() + 3, getX() + width + 2, getY() + height + 3, 0x55000000);
+            context.fill(getX(), getY(), getX() + width, getY() + height, hovered ? 0xE63A4657 : 0xD91B202B);
+            context.fill(getX(), getY(), getX() + width, getY() + 1, hovered ? 0xFFDDE8F8 : 0x667F91A8);
+            context.drawCenteredTextWithShadow(MinecraftClient.getInstance().textRenderer, getMessage(),
+                    getX() + width / 2, getY() + (height - 8) / 2, active ? 0xFFFFFFFF : 0xFFAAAAAA);
+        }
     }
 
     @Override
