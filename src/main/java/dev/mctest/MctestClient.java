@@ -256,7 +256,8 @@ public final class MctestClient implements ClientModInitializer {
 
     private static void runSpeed(MinecraftClient client) {
         if (client.player == null) return;
-        if (client.player.horizontalSpeed > 0.01F) {
+        // BURASI DÜZELTİLDİ: horizontalSpeed yerine getVelocity().horizontalLength() kullanıldı[span_1](start_span)[span_1](end_span)[span_2](start_span)[span_2](end_span)[span_3](start_span)[span_3](end_span)
+        if (client.player.getVelocity().horizontalLength() > 0.01) {
             Vec3d vel = client.player.getVelocity();
             client.player.setVelocity(vel.x * speedMultiplier, vel.y, vel.z * speedMultiplier);
         }
