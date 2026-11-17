@@ -146,7 +146,7 @@ public final class VexionTitleScreen extends Screen {
     @Override
     public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
         context.drawTexture(RenderLayer::getGuiTextured, BACKGROUND,
-                0, 0, 0.0f, 0.0f, width, height, 800, 450);
+                0, 0, 0.0f, 0.0f, width, height, 400, 225);
         context.fillGradient(0, 0, width, height, 0x12040A16, 0x44020710);
     }
 
