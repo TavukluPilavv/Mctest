@@ -1,0 +1,10 @@
+{
+  "welcome": {
+    "sounds": [
+      {
+        "name": "attackaura:welcome",
+        "stream": false
+      }
+    ]
+  }
+}
