@@ -73,6 +73,7 @@ public final class MctestClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
+        VexionSounds.register();
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             if (client.getWindow() == null) return;
             long handle = client.getWindow().getHandle();
